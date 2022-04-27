@@ -49,4 +49,4 @@ class BotQueue(Table, tablename="bot_queue"):
     added_at = Timestamptz(null=False, default=TimestamptzNow())
     state = Integer(choices=State, default=State.PENDING)
     list_source = ForeignKey(null=True, references=BotList, on_delete=OnDelete.cascade, on_update=OnUpdate.cascade)
-    owner = BigInt(primary_key=True)
+    owner = BigInt(null=False)

@@ -5,7 +5,6 @@ from piccolo.engine.postgres import PostgresEngine
 # See https://piccolo-orm.readthedocs.io/en/stable/piccolo/projects_and_apps/piccolo_projects.html#example
 DB = PostgresEngine(config={
     "database": "brc",
-    "host": "localhost",
 })
 
 
