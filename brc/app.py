@@ -34,8 +34,9 @@ app = FastAPI(
             create_admin(
                 tables=_tables,
                 site_name="BRC Admin",
+                production=True,
                 # Required when running under HTTPS:
-                # allowed_hosts=['my_site.com']
+                allowed_hosts=['brc.codes']
             ),
         ),
     ],
@@ -87,6 +88,10 @@ class BotPost(pydantic.BaseModel):
     owner: str
 
 auth_header = APIKeyHeader(name='Authorization')
+
+@app.get("/bots/{id}")
+async def get_bot(id: int):
+    return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
 @app.get("/bots")
 async def get_queue():
@@ -156,6 +161,15 @@ async def post_act(
 ):
     if not isinstance(interaction.user, discord.Member):
         return
+    
+    bot_data = await tables.BotQueue.select(tables.BotQueue.state).where(tables.BotQueue.bot_id == bot_id).first()
+
+    if not bot_data:
+        return await interaction.response.send_message(f"This bot (`{bot_id}`) cannot be found")
+    
+    if action == tables.Action.CLAIM and bot_data["state"] != tables.State.PENDING:
+        return await interaction.response.send_message("This bot cannot be claimed as it is not pending review?")
+
 
     if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
         return await interaction.response.send_message("You must have the `Reviewer` role to use this command.")
@@ -194,6 +208,7 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
             bot_id = int(self.bot_id.value)
         except:
             return await interaction.response.send_message("Bot ID invalid") # Don't respond, so it gives error on their side
+        
 
         list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.claim_bot_api, tables.BotList.secret_key)
 
