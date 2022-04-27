@@ -1,0 +1,4 @@
+piccolo[all]
+orjson
+uvloop
+fastapi
