@@ -4,13 +4,15 @@ import json
 import aiohttp
 import discord
 from discord.ext import commands
-from fastapi.responses import RedirectResponse
-from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse, ORJSONResponse
+from fastapi.security.api_key import APIKeyHeader
+from fastapi import Depends, FastAPI, Request
 from fastapi.routing import Mount
 from piccolo.engine import engine_finder
 from piccolo_admin.endpoints import create_admin
 
 import piccolo
+import pydantic
 
 from . import tables
 import inspect
@@ -45,6 +47,7 @@ with open("secrets.json") as f:
     secrets = json.load(f)
     secrets["gid"] = int(secrets["gid"])
     secrets["reviewer"] = int(secrets["reviewer"])
+    secrets["queue_channel"] = int(secrets["queue_channel"])
 
 @app.on_event("startup")
 async def open_database_connection_pool():
@@ -58,9 +61,6 @@ async def open_database_connection_pool():
 async def close_database_connection_pool():
     engine = engine_finder()
     await engine.close_connnection_pool()
-
-async def list_auth(list_id: str):
-    ...
 
 @app.get("/")
 async def brc_index():
@@ -77,6 +77,52 @@ async def get_actions():
         action["bot_id"] = str(action["bot_id"])
     
     return actions
+
+class BotPost(pydantic.BaseModel):
+    bot_id: str
+    list_id: int
+    username: str
+
+auth_header = APIKeyHeader(name='Authorization')
+
+@app.get("/bots")
+async def get_queue():
+    """
+``list_source`` will not be present if it is not relevant
+    """
+    bots = await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
+
+    for bot in bots:
+        bot["bot_id"] = str(bot["bot_id"])
+    
+    return bots
+
+@app.post("/bots")
+async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_header)):
+    list = await tables.BotList.select(tables.BotList.secret_key).where(tables.BotList.id == _bot.list_id).first()
+    if not list:
+        return ORJSONResponse({"error": "List not found"}, status_code=404)
+    if auth != list["secret_key"]:
+        return ORJSONResponse({"error": "Invalid secret key"}, status_code=401)
+    
+    try:
+        bot_id = int(_bot.bot_id)
+    except:
+        return ORJSONResponse({"error": "Invalid bot id"}, status_code=400)
+
+    curr_bot = await tables.BotQueue.select(tables.BotQueue.bot_id).where(tables.BotQueue.bot_id == bot_id)
+
+    if len(curr_bot) > 0:
+        return ORJSONResponse({"error": "Bot already in queue"}, status_code=400)
+
+    await tables.BotQueue.insert(
+        tables.BotQueue(bot_id=bot_id, username=_bot.username, list_source=_bot.list_id)
+    )
+
+    # TODO: Add bot add propogation in final scope plans if this is successful
+    embed = discord.Embed(title="Bot Added To Queue", description=f"**Bot ID**: {bot_id}\n**Username:** {_bot.username}", color=discord.Color.green())
+    c = bot.get_channel(secrets["queue_channel"])
+    await c.send(f"<@&{secrets['reviewer']}>", embed=embed)
 
 class FSnowflake():
     """Blame discord"""
@@ -99,7 +145,7 @@ async def post_act(
     if not isinstance(interaction.user, discord.Member):
         return
 
-    if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]):
+    if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
         return await interaction.response.send_message("You must have the `Reviewer` role to use this command.")
 
     msg = f"**{action.name.title()}!**\n"

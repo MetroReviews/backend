@@ -31,3 +31,9 @@ class BotAction(Table, tablename="bot_action"):
     reviewer = Text(null=False)
     action_time = Timestamptz(null=False, default=TimestamptzNow())
     list_source = ForeignKey(null=True, references=BotList, on_delete=OnDelete.cascade, on_update=OnUpdate.cascade)
+
+class BotQueue(Table, tablename="bot_queue"):
+    bot_id = BigInt(primary_key=True)
+    username = Text(null=False)
+    added_at = Timestamptz(null=False, default=TimestamptzNow())
+    list_source = ForeignKey(null=True, references=BotList, on_delete=OnDelete.cascade, on_update=OnUpdate.cascade)
