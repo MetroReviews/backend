@@ -82,6 +82,14 @@ class BotPost(pydantic.BaseModel):
     bot_id: str
     list_id: int
     username: str
+    description: str 
+    long_description: str
+    website: str | None = None
+    github: str | None = None
+    privacy_policy: str | None = None
+    banner: str | None = None
+    invite: str | None = None
+    extra_links: dict[str, str] | None = {}
 
 auth_header = APIKeyHeader(name='Authorization')
 
@@ -116,7 +124,20 @@ async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_he
         return ORJSONResponse({"error": "Bot already in queue"}, status_code=400)
 
     await tables.BotQueue.insert(
-        tables.BotQueue(bot_id=bot_id, username=_bot.username, list_source=_bot.list_id)
+        tables.BotQueue(
+            bot_id=bot_id, 
+            username=_bot.username, 
+            list_source=_bot.list_id,
+            description=_bot.description,
+            long_description=_bot.long_description,
+            website=_bot.website,
+            github=_bot.github,
+            privacy_policy=_bot.privacy_policy,
+            banner=_bot.banner,
+            invite=_bot.invite,
+            extra_links=_bot.extra_links,
+            state=tables.State.PENDING
+        )
     )
 
     # TODO: Add bot add propogation in final scope plans if this is successful

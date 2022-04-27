@@ -1,4 +1,8 @@
 piccolo[all]
+piccolo_admin
 orjson
 uvloop
 fastapi
+git+https://github.com/Rapptz/discord.py
+git+https://github.com/samuelcolvin/pydantic
+jishaku
