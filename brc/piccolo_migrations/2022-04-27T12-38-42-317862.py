@@ -1,8 +1,9 @@
 from piccolo.apps.migrations.auto.migration_manager import MigrationManager
+from piccolo.columns.column_types import BigInt
 from piccolo.columns.column_types import Text
 
 
-ID = "2022-04-27T09:41:06:498099"
+ID = "2022-04-27T12:38:42:317862"
 VERSION = "0.74.1"
 DESCRIPTION = ""
 
@@ -16,9 +17,19 @@ async def forwards():
         table_class_name="BotList",
         tablename="bot_list",
         column_name="secret_key",
-        params={"default": "lQGT_50AozkUXq9vVC24Ed7KZxHvmz-oI90ui3Fqs4g"},
-        old_params={"default": "Ga6rGaSZiwCAdyCqyseLjblqzla874r6CjbOUH7Gq-g"},
+        params={"default": "TOVhlkUB8vKz3-QvI24uQRohM9EUQWhVRh79lhq7aN8"},
+        old_params={"default": "VQkhKvt1FB-uLbNDU1pj1ATMk3TEaHJCXgRgjaprg5M"},
         column_class=Text,
+        old_column_class=Text,
+    )
+
+    manager.alter_column(
+        table_class_name="BotAction",
+        tablename="bot_action",
+        column_name="bot_id",
+        params={"default": 0},
+        old_params={"default": ""},
+        column_class=BigInt,
         old_column_class=Text,
     )
 
