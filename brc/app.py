@@ -83,13 +83,8 @@ class BotPost(pydantic.BaseModel):
     list_id: int
     username: str
     description: str 
-    long_description: str
-    website: str | None = None
-    github: str | None = None
-    privacy_policy: str | None = None
-    banner: str | None = None
     invite: str | None = None
-    extra_links: dict[str, str] | None = {}
+    owner: str
 
 auth_header = APIKeyHeader(name='Authorization')
 
@@ -115,6 +110,7 @@ async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_he
     
     try:
         bot_id = int(_bot.bot_id)
+        owner = int(_bot.owner)
     except:
         return ORJSONResponse({"error": "Invalid bot id"}, status_code=400)
 
@@ -129,13 +125,8 @@ async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_he
             username=_bot.username, 
             list_source=_bot.list_id,
             description=_bot.description,
-            long_description=_bot.long_description,
-            website=_bot.website,
-            github=_bot.github,
-            privacy_policy=_bot.privacy_policy,
-            banner=_bot.banner,
             invite=_bot.invite,
-            extra_links=_bot.extra_links,
+            owner=_bot.owner,
             state=tables.State.PENDING
         )
     )
