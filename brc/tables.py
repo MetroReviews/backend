@@ -44,7 +44,8 @@ class BotList(Table, tablename="bot_list"):
     secret_key = Text(null=False, default=secrets.token_urlsafe())
 
 class BotAction(Table, tablename="bot_action"):
-    bot_id = BigInt(primary_key=True)
+    id = Serial(primary_key=True)
+    bot_id = BigInt(null=False)
     action = Integer(null=False, choices=Action)
     reason = Text(null=False)
     reviewer = Text(null=False)

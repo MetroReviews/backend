@@ -31,7 +31,8 @@ CREATE TABLE bot_queue (
 );
 
 CREATE TABLE bot_action (
-    bot_id bigint NOT NULL,
+    id serial not null,
+    bot_id bigint not null,
     action integer DEFAULT 0 NOT NULL,
     reason text DEFAULT ''::text NOT NULL,
     reviewer text DEFAULT ''::text NOT NULL,

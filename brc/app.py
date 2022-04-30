@@ -88,7 +88,6 @@ async def get_actions():
 
 class BotPost(pydantic.BaseModel):
     bot_id: str
-    list_id: int
     username: str
     banner: str | None = None
     description: str 
@@ -98,24 +97,21 @@ class BotPost(pydantic.BaseModel):
     owner: str
     extra_owners: list[str]
 
+class Bot(BotPost):
+    state: tables.State
+    list_source: int
+    added_at: datetime.datetime
+
 auth_header = APIKeyHeader(name='Authorization')
 
-@app.get("/bots/{id}", response_model=BotPost)
-async def get_bot(id: int) -> BotPost:
+@app.get("/bots/{id}", response_model=Bot)
+async def get_bot(id: int) -> Bot:
     return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
-@app.get("/bots", response_model=list[BotPost])
-async def get_queue() -> list[BotPost]:
-    """
-``list_source`` will not be present if it is not relevant
-    """
-    bots = await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
-
-    for bot in bots:
-        bot["bot_id"] = str(bot["bot_id"])
+@app.get("/bots", response_model=list[Bot])
+async def get_queue() -> list[Bot]:
+    return await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
     
-    return bots
-
 good_states = (tables.ListState.PENDING_API_SUPPORT, tables.ListState.SUPPORTED)
 
 async def _auth(list_id: int, key: str) -> ORJSONResponse | None:
@@ -129,13 +125,13 @@ async def _auth(list_id: int, key: str) -> ORJSONResponse | None:
         return ORJSONResponse({"error": "List blacklisted, defunct or in an unknown state"}, status_code=401)
 
 @app.post("/bots")
-async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_header)):
+async def post_bots(request: Request, _bot: BotPost, list_id: int, auth: str = Depends(auth_header)):
     """
 All optional fields are actually *optional* and does not need to be posted
 
 ``extra_owners`` should be a empty list if you do not support it
     """
-    if (auth := await _auth(_bot.list_id, auth)):
+    if (auth := await _auth(list_id, auth)):
         return auth 
     
     try:
@@ -155,7 +151,7 @@ All optional fields are actually *optional* and does not need to be posted
             bot_id=bot_id, 
             username=_bot.username, 
             banner=_bot.banner,
-            list_source=_bot.list_id,
+            list_source=list_id,
             description=_bot.description,
             long_description=_bot.long_description,
             website=_bot.website,
@@ -241,7 +237,7 @@ async def post_act(
                 async with sess.post(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                    json={"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id), "bot": bot_data}
+                    json=bot_data | {"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)}
                 ) as resp:
                     msg += f"{list['name']} -> {resp.status}"
                     try:
@@ -249,8 +245,8 @@ async def post_act(
                     except Exception as exc:
                         json_d = f"JSON deser failed {exc}"
                     msg += f" ({json_d})\n"
-        except:
-            continue
+        except Exception as exc:
+            msg += f"{list['name']} -> {exc}"
     
     # Post intent to actions
     await tables.BotAction.insert(
