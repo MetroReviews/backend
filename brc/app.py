@@ -141,10 +141,37 @@ async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_he
     c = bot.get_channel(secrets["queue_channel"])
     await c.send(f"<@&{secrets['reviewer']}>", embed=embed)
 
+
+class PrefixSupport(discord.ui.View):
+    def __init__(self, modal: discord.ui.Modal):
+        self.modal = modal()
+        super().__init__(timeout=180)
+
+    @discord.ui.button(label="Click Here")
+    async def click_here(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(self.modal)
+
+# Decorator to auto add legacy prefix support
+def mr_command(modal_class):
+    def wrapper(f):
+        @bot.command(name=f.__name__, help=f.__doc__)
+        async def _(ctx: commands.Context):
+            await ctx.send("To continue, click the below button", view=PrefixSupport(modal_class))
+        return f
+    return wrapper
+
+
+
 class FSnowflake():
     """Blame discord"""
     def __init__(self, id):
         self.id: int = id
+
+@bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+async def sync(interaction: discord.Interaction):
+    """Syncs all commands"""
+    await bot.tree.sync(guild=FSnowflake(id=secrets["gid"]))
+    return await interaction.response.send_message("Done syncing")
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
 async def support(interaction: discord.Interaction):
@@ -259,28 +286,28 @@ class Deny(discord.ui.Modal, title='Deny Bot'):
 
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+@mr_command(modal_class=Claim)
 async def claim(interaction: discord.Interaction):
     """Claim a bot"""
     return await interaction.response.send_modal(Claim())
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+@mr_command(modal_class=Unclaim)
 async def unclaim(interaction: discord.Interaction):
     """Unclaims a bot"""
     return await interaction.response.send_modal(Unclaim())
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+@mr_command(modal_class=Approve)
 async def approve(interaction: discord.Interaction):
     """Approves a bot"""
     return await interaction.response.send_modal(Approve())
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+@mr_command(modal_class=Deny)
 async def deny(interaction: discord.Interaction):
-    """Approves a bot"""
+    """Denies a bot"""
     return await interaction.response.send_modal(Deny())
-
-@bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
-async def sync(interaction: discord.Interaction):
-    await bot.tree.sync(guild=FSnowflake(id=secrets["gid"]))
 
 @bot.event
 async def on_ready():
@@ -289,3 +316,4 @@ async def on_ready():
     await bot.tree.sync(guild=FSnowflake(id=secrets["gid"]))
     for cmd in bot.tree.walk_commands():
         print(cmd.name)
+        
