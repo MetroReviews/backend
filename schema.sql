@@ -3,18 +3,18 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE bot_list (
-    id integer NOT NULL,
+    id serial primary key,
     name text DEFAULT '' NOT NULL,
+    state integer not null default 0,
     claim_bot_api text DEFAULT '' NOT NULL,
     unclaim_bot_api text DEFAULT '' NOT NULL,
     approve_bot_api text DEFAULT '' NOT NULL,
     deny_bot_api text DEFAULT '' NOT NULL,
-    secret_key text DEFAULT 'default' NOT NULL,
-    CONSTRAINT bot_list_pkey PRIMARY KEY (id)
+    secret_key text DEFAULT 'default' NOT NULL
 );
 
 CREATE TABLE bot_queue (
-    bot_id bigint DEFAULT 0 NOT NULL,
+    bot_id bigint NOT NULL,
     username text DEFAULT ''::text NOT NULL,
     banner text DEFAULT ''::text,
     description text DEFAULT ''::text NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE bot_queue (
 );
 
 CREATE TABLE bot_action (
-    bot_id bigint DEFAULT 0 NOT NULL,
+    bot_id bigint NOT NULL,
     action integer DEFAULT 0 NOT NULL,
     reason text DEFAULT ''::text NOT NULL,
     reviewer text DEFAULT ''::text NOT NULL,

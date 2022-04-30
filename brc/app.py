@@ -36,7 +36,7 @@ app = FastAPI(
                 site_name="BRC Admin",
                 production=True,
                 # Required when running under HTTPS:
-                allowed_hosts=['brc.codes']
+                allowed_hosts=['metrobots.xyz']
             ),
         ),
     ],
@@ -69,6 +69,10 @@ async def close_database_connection_pool():
 @app.get("/")
 async def brc_index():
     return HTMLResponse(site_html)
+
+@app.get("/lists")
+async def lists():
+    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state).order_by(tables.BotList.id, ascending=False)
 
 @app.get("/actions")
 async def get_actions():

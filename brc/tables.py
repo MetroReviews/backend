@@ -24,8 +24,14 @@ Current bot state
     APPROVED = 2
     DENIED = 3
 
+class ListState(enum.IntEnum):
+    PENDING_API_SUPPORT = 0
+    SUPPORTED = 1
+    DEFUNCT = 2
+
 class BotList(Table, tablename="bot_list"):
     id = Serial(primary_key=True)
+    state = Integer(null=False, choices=ListState, default=ListState.PENDING_API_SUPPORT)
     name = Text(null=False)
     claim_bot_api = Text(null=False)
     unclaim_bot_api = Text(null=False)
@@ -35,7 +41,7 @@ class BotList(Table, tablename="bot_list"):
 
 class BotAction(Table, tablename="bot_action"):
     bot_id = BigInt(primary_key=True)
-    action = Integer(choices=Action)
+    action = Integer(null=False, choices=Action)
     reason = Text(null=False)
     reviewer = Text(null=False)
     action_time = Timestamptz(null=False, default=TimestamptzNow())
