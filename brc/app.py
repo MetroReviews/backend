@@ -72,7 +72,7 @@ async def brc_index():
 
 @app.get("/lists")
 async def lists():
-    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state).order_by(tables.BotList.id, ascending=False)
+    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state).order_by(tables.BotList.id, ascending=True)
 
 @app.get("/actions")
 async def get_actions():
@@ -237,18 +237,21 @@ async def post_act(
     for list in list_info:
         if list["state"] not in good_states:
             continue
-        async with aiohttp.ClientSession() as sess:
-            async with sess.post(
-                list[key], 
-                headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                json={"bot_id": str(bot_id), "reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)}
-            ) as resp:
-                msg += f"{list['name']} -> {resp.status}"
-                try:
-                    json_d = await resp.json()
-                except Exception as exc:
-                    json_d = f"JSON deser failed {exc}"
-                msg += f" ({json_d})\n"
+        try:
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post(
+                    list[key], 
+                    headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
+                    json={"bot_id": str(bot_id), "reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)}
+                ) as resp:
+                    msg += f"{list['name']} -> {resp.status}"
+                    try:
+                        json_d = await resp.json()
+                    except Exception as exc:
+                        json_d = f"JSON deser failed {exc}"
+                    msg += f" ({json_d})\n"
+        except:
+            continue
     
     # Post intent to actions
     await tables.BotAction.insert(

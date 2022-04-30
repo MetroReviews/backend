@@ -4,24 +4,59 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
     <style>
+        h1, h2, h3, h4, h5, h6, p, pre, details, summary, span {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
         summary {
             cursor: pointer;
+            padding: 0.5px;
+            font: 18px bold;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        details[open] summary {
+            border-bottom: solid thin;
+        }
+
+        details {
+            border: solid thin;
+        }
+
+        details {
+            background-color: #D3D3D3;
+        }
+
+        /*Override background-color for summary*/
+        details summary {
+            background-color: #f4f0ec;
         }
     </style>
     <body>
         <h1>Metro Bots</h1>
-        <details>
+        <details open>
             <summary>Who are we</summary>
             <p>Metro Bots is a consortium of bot lists to allow easier and quicker bot reviews and approvals</p>
         </details>
-        <details>
-            <summary>Supported Lists</summary>
+        <details open>
+            <summary>Lists</summary>
+            <strong>Metro Bots is always happy to get new lists to partner with. Here is our current ever-growing list:</strong>
             <ol id="supported-lists">
             </ol>
         </details>
-        <details>
+        <details open>
             <summary>Our Discord Server</summary>
             <p>You can find our discord server here: <a href="https://discord.gg/TYBGxncd5j">https://discord.gg/TYBGxncd5j</a></p>
+        </details>
+        <details open>
+            <summary>FAQ</summary>
+            <p>
+                <strong>My list requires users to be in our server? Is this taken into consideration?</strong><br/>
+                Metro reviews doesn't really require users to be on support server.
+                <br/><br/>
+                
+                That being said, you can mandate it on your own list but metro reviews won't really follow that when reviewing bots.              
+            </p>
         </details>
     </body>
     <script>
@@ -39,10 +74,11 @@
         docReady(async () => {
             let listData = await fetch("/lists")
             if(listData.ok) {
-                listJson = await listData.json()
-                document.querySelector("#supported-lists").innerHTML = listJson
+                let listArr = await listData.json()
+                listArr.forEach(el => {
+                    document.querySelector("#supported-lists").innerHTML += `<li>${el.name}: ${el.state}</li>`
+                })
             }
         })
-
     </script>
 </html>
