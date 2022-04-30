@@ -237,7 +237,7 @@ async def post_act(
                 async with sess.post(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                    json=bot_data | {"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)}
+                    json=bot_data | {"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)} | {"added_at": str(bot_data["added_at"])}
                 ) as resp:
                     msg += f"{list['name']} -> {resp.status}"
                     try:
@@ -246,7 +246,7 @@ async def post_act(
                         json_d = f"JSON deser failed {exc}"
                     msg += f" ({json_d})\n"
         except Exception as exc:
-            msg += f"{list['name']} -> {exc}"
+            msg += f"{list['name']} -> {type(exc).__name__}: {exc}\n"
     
     # Post intent to actions
     await tables.BotAction.insert(
