@@ -4,7 +4,7 @@ import json
 import aiohttp
 import discord
 from discord.ext import commands
-from fastapi.responses import RedirectResponse, ORJSONResponse
+from fastapi.responses import HTMLResponse, ORJSONResponse
 from fastapi.security.api_key import APIKeyHeader
 from fastapi import Depends, FastAPI, Request
 from fastapi.routing import Mount
@@ -42,6 +42,9 @@ app = FastAPI(
     ],
 )
 
+with open("site.html") as site:
+    site_html = site.read()
+
 bot = commands.Bot(intents=discord.Intents.all(), command_prefix="%")
 
 with open("secrets.json") as f:
@@ -65,7 +68,7 @@ async def close_database_connection_pool():
 
 @app.get("/")
 async def brc_index():
-    return RedirectResponse("https://github.com/organizations/BotReviewerConsortium")
+    return HTMLResponse(site_html)
 
 @app.get("/actions")
 async def get_actions():
@@ -83,18 +86,22 @@ class BotPost(pydantic.BaseModel):
     bot_id: str
     list_id: int
     username: str
+    banner: str | None = None
     description: str 
+    long_description: str
+    website: str | None = None
     invite: str | None = None
     owner: str
+    extra_owners: list[str]
 
 auth_header = APIKeyHeader(name='Authorization')
 
-@app.get("/bots/{id}")
-async def get_bot(id: int):
+@app.get("/bots/{id}", response_model=BotPost)
+async def get_bot(id: int) -> BotPost:
     return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
-@app.get("/bots")
-async def get_queue():
+@app.get("/bots", response_model=list[BotPost])
+async def get_queue() -> list[BotPost]:
     """
 ``list_source`` will not be present if it is not relevant
     """
@@ -107,6 +114,11 @@ async def get_queue():
 
 @app.post("/bots")
 async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_header)):
+    """
+All optional fields are actually *optional* and does not need to be posted
+
+``extra_owners`` should be a empty list if you do not support it
+    """
     list = await tables.BotList.select(tables.BotList.secret_key).where(tables.BotList.id == _bot.list_id).first()
     if not list:
         return ORJSONResponse({"error": "List not found"}, status_code=404)
@@ -116,8 +128,9 @@ async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_he
     try:
         bot_id = int(_bot.bot_id)
         owner = int(_bot.owner)
+        extra_owners = [int(v) for v in _bot.extra_owners]
     except:
-        return ORJSONResponse({"error": "Invalid bot id"}, status_code=400)
+        return ORJSONResponse({"error": "Invalid bot fields"}, status_code=400)
 
     curr_bot = await tables.BotQueue.select(tables.BotQueue.bot_id).where(tables.BotQueue.bot_id == bot_id)
 
@@ -128,10 +141,14 @@ async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_he
         tables.BotQueue(
             bot_id=bot_id, 
             username=_bot.username, 
+            banner=_bot.banner,
             list_source=_bot.list_id,
             description=_bot.description,
+            long_description=_bot.long_description,
+            website=_bot.website,
             invite=_bot.invite,
-            owner=_bot.owner,
+            owner=owner,
+            extra_owners=extra_owners,
             state=tables.State.PENDING
         )
     )

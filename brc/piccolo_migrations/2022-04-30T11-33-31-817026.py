@@ -26,8 +26,8 @@ class BotList(Table, tablename="bot_list"):
     )
 
 
-ID = "2022-04-27T16:22:31:457329"
-VERSION = "0.74.1"
+ID = "2022-04-30T11:33:31:817026"
+VERSION = "0.74.2"
 DESCRIPTION = ""
 
 
@@ -36,177 +36,11 @@ async def forwards():
         migration_id=ID, app_name="brc", description=DESCRIPTION
     )
 
-    manager.add_table("BotQueue", tablename="bot_queue")
-
     manager.add_table("BotList", tablename="bot_list")
 
+    manager.add_table("BotQueue", tablename="bot_queue")
+
     manager.add_table("BotAction", tablename="bot_action")
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="bot_id",
-        db_column_name="bot_id",
-        column_class_name="BigInt",
-        column_class=BigInt,
-        params={
-            "default": 0,
-            "null": False,
-            "primary_key": True,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="username",
-        db_column_name="username",
-        column_class_name="Text",
-        column_class=Text,
-        params={
-            "default": "",
-            "null": False,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="description",
-        db_column_name="description",
-        column_class_name="Text",
-        column_class=Text,
-        params={
-            "default": "",
-            "null": False,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="invite",
-        db_column_name="invite",
-        column_class_name="Text",
-        column_class=Text,
-        params={
-            "default": "",
-            "null": True,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="added_at",
-        db_column_name="added_at",
-        column_class_name="Timestamptz",
-        column_class=Timestamptz,
-        params={
-            "default": TimestamptzNow(),
-            "null": False,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="state",
-        db_column_name="state",
-        column_class_name="Integer",
-        column_class=Integer,
-        params={
-            "default": 0,
-            "null": False,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": Enum(
-                "State",
-                {"PENDING": 0, "UNDER_REVIEW": 1, "APPROVED": 2, "DENIED": 3},
-            ),
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="list_source",
-        db_column_name="list_source",
-        column_class_name="ForeignKey",
-        column_class=ForeignKey,
-        params={
-            "references": BotList,
-            "on_delete": OnDelete.cascade,
-            "on_update": OnUpdate.cascade,
-            "target_column": None,
-            "null": True,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
-
-    manager.add_column(
-        table_class_name="BotQueue",
-        tablename="bot_queue",
-        column_name="owner",
-        db_column_name="owner",
-        column_class_name="BigInt",
-        column_class=BigInt,
-        params={
-            "default": 0,
-            "null": False,
-            "primary_key": False,
-            "unique": False,
-            "index": False,
-            "index_method": IndexMethod.btree,
-            "choices": None,
-            "db_column_name": None,
-            "secret": False,
-        },
-    )
 
     manager.add_column(
         table_class_name="BotList",
@@ -335,7 +169,233 @@ async def forwards():
         column_class_name="Text",
         column_class=Text,
         params={
-            "default": "CgjY-_5Yp643tRxnoyTFbCOIt2wUV537Q-sAUDbWjPA",
+            "default": "cNM6gWOc6lO1jWXm_na8MQWB7fRSjvVqMj7ekOTqN8M",
+            "null": False,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="bot_id",
+        db_column_name="bot_id",
+        column_class_name="BigInt",
+        column_class=BigInt,
+        params={
+            "default": 0,
+            "null": False,
+            "primary_key": True,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="username",
+        db_column_name="username",
+        column_class_name="Text",
+        column_class=Text,
+        params={
+            "default": "",
+            "null": False,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="banner",
+        db_column_name="banner",
+        column_class_name="Text",
+        column_class=Text,
+        params={
+            "default": "",
+            "null": True,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="description",
+        db_column_name="description",
+        column_class_name="Text",
+        column_class=Text,
+        params={
+            "default": "",
+            "null": False,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="long_description",
+        db_column_name="long_description",
+        column_class_name="Text",
+        column_class=Text,
+        params={
+            "default": "",
+            "null": False,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="website",
+        db_column_name="website",
+        column_class_name="Text",
+        column_class=Text,
+        params={
+            "default": "",
+            "null": True,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="invite",
+        db_column_name="invite",
+        column_class_name="Text",
+        column_class=Text,
+        params={
+            "default": "",
+            "null": True,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="added_at",
+        db_column_name="added_at",
+        column_class_name="Timestamptz",
+        column_class=Timestamptz,
+        params={
+            "default": TimestamptzNow(),
+            "null": False,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="state",
+        db_column_name="state",
+        column_class_name="Integer",
+        column_class=Integer,
+        params={
+            "default": 0,
+            "null": False,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": Enum(
+                "State",
+                {"PENDING": 0, "UNDER_REVIEW": 1, "APPROVED": 2, "DENIED": 3},
+            ),
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="list_source",
+        db_column_name="list_source",
+        column_class_name="ForeignKey",
+        column_class=ForeignKey,
+        params={
+            "references": BotList,
+            "on_delete": OnDelete.cascade,
+            "on_update": OnUpdate.cascade,
+            "target_column": None,
+            "null": True,
+            "primary_key": False,
+            "unique": False,
+            "index": False,
+            "index_method": IndexMethod.btree,
+            "choices": None,
+            "db_column_name": None,
+            "secret": False,
+        },
+    )
+
+    manager.add_column(
+        table_class_name="BotQueue",
+        tablename="bot_queue",
+        column_name="owner",
+        db_column_name="owner",
+        column_class_name="BigInt",
+        column_class=BigInt,
+        params={
+            "default": 0,
             "null": False,
             "primary_key": False,
             "unique": False,

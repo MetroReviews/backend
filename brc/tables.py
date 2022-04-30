@@ -2,7 +2,7 @@ import secrets
 import enum
 
 from piccolo.table import Table
-from piccolo.columns import Text, Timestamptz, Integer, ForeignKey, Serial, BigInt, JSONB
+from piccolo.columns import Text, Timestamptz, Integer, ForeignKey, Serial, BigInt, Array
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.columns.base import OnDelete, OnUpdate
 
@@ -44,9 +44,13 @@ class BotAction(Table, tablename="bot_action"):
 class BotQueue(Table, tablename="bot_queue"):
     bot_id = BigInt(primary_key=True)
     username = Text(null=False)
+    banner = Text(null=True)
     description = Text(null=False)
+    long_description = Text(null=False)
+    website = Text(null=True)
     invite = Text(null=True)
     added_at = Timestamptz(null=False, default=TimestamptzNow())
     state = Integer(choices=State, default=State.PENDING)
     list_source = ForeignKey(null=True, references=BotList, on_delete=OnDelete.cascade, on_update=OnUpdate.cascade)
     owner = BigInt(null=False)
+    extra_owners = Array(base_column=BigInt(null=False), default=[])
