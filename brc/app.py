@@ -116,6 +116,18 @@ async def get_queue() -> list[BotPost]:
     
     return bots
 
+good_states = (tables.ListState.PENDING_API_SUPPORT, tables.ListState.SUPPORTED)
+
+async def _auth(list_id: int, key: str) -> ORJSONResponse | None:
+    list = await tables.BotList.select(tables.BotList.secret_key, tables.BotList.state).where(tables.BotList.id == list_id).first()
+    if not list:
+        return ORJSONResponse({"error": "List not found"}, status_code=404)
+    if key != list["secret_key"]:
+        return ORJSONResponse({"error": "Invalid secret key"}, status_code=401)
+    
+    if list["state"] not in good_states:
+        return ORJSONResponse({"error": "List blacklisted, defunct or in an unknown state"}, status_code=401)
+
 @app.post("/bots")
 async def post_bots(request: Request, _bot: BotPost, auth: str = Depends(auth_header)):
     """
@@ -123,11 +135,8 @@ All optional fields are actually *optional* and does not need to be posted
 
 ``extra_owners`` should be a empty list if you do not support it
     """
-    list = await tables.BotList.select(tables.BotList.secret_key).where(tables.BotList.id == _bot.list_id).first()
-    if not list:
-        return ORJSONResponse({"error": "List not found"}, status_code=404)
-    if auth != list["secret_key"]:
-        return ORJSONResponse({"error": "Invalid secret key"}, status_code=401)
+    if (auth := await _auth(_bot.list_id, auth)):
+        return auth 
     
     try:
         bot_id = int(_bot.bot_id)
@@ -226,6 +235,8 @@ async def post_act(
 
     await interaction.response.defer()
     for list in list_info:
+        if list["state"] not in good_states:
+            continue
         async with aiohttp.ClientSession() as sess:
             async with sess.post(
                 list[key], 
@@ -258,7 +269,7 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
             return await interaction.response.send_message("Bot ID invalid") # Don't respond, so it gives error on their side
         
 
-        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.claim_bot_api, tables.BotList.secret_key)
+        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.claim_bot_api, tables.BotList.secret_key)
 
         return await post_act(interaction, list_info, tables.Action.CLAIM, "claim_bot_api", bot_id, "STUB_REASON")
 
@@ -272,7 +283,7 @@ class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
         except:
             return await interaction.response.send_message("Bot ID invalid") # Don't respond, so it gives error on their side
 
-        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.unclaim_bot_api, tables.BotList.secret_key)
+        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.unclaim_bot_api, tables.BotList.secret_key)
 
         return await post_act(interaction, list_info, tables.Action.UNCLAIM, "unclaim_bot_api", bot_id, self.reason.value)
 
@@ -287,7 +298,7 @@ class Approve(discord.ui.Modal, title='Approve Bot'):
         except:
             return await interaction.response.send_message("Bot ID invalid") # Don't respond, so it gives error on their side
 
-        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.approve_bot_api, tables.BotList.secret_key)
+        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.approve_bot_api, tables.BotList.secret_key)
 
         return await post_act(interaction, list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, self.reason.value)
 
@@ -301,7 +312,7 @@ class Deny(discord.ui.Modal, title='Deny Bot'):
         except:
             return await interaction.response.send_message("Bot ID invalid") # Don't respond, so it gives error on their side
 
-        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.deny_bot_api, tables.BotList.secret_key)
+        list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.deny_bot_api, tables.BotList.secret_key)
 
         return await post_act(interaction, list_info, tables.Action.DENY, "deny_bot_api", bot_id, self.reason.value)
 

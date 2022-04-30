@@ -25,9 +25,13 @@ Current bot state
     DENIED = 3
 
 class ListState(enum.IntEnum):
+    """
+A lists state
+    """
     PENDING_API_SUPPORT = 0
     SUPPORTED = 1
     DEFUNCT = 2
+    BLACKLISTED = 3
 
 class BotList(Table, tablename="bot_list"):
     id = Serial(primary_key=True)
