@@ -219,14 +219,13 @@ async def post_act(
     if not isinstance(interaction.user, discord.Member):
         return
     
-    bot_data = await tables.BotQueue.select(tables.BotQueue.state).where(tables.BotQueue.bot_id == bot_id).first()
+    bot_data = await tables.BotQueue.select().where(tables.BotQueue.bot_id == bot_id).first()
 
     if not bot_data:
         return await interaction.response.send_message(f"This bot (`{bot_id}`) cannot be found")
     
     if action == tables.Action.CLAIM and bot_data["state"] != tables.State.PENDING:
         return await interaction.response.send_message("This bot cannot be claimed as it is not pending review?")
-
 
     if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
         return await interaction.response.send_message("You must have the `Reviewer` role to use this command.")
@@ -242,7 +241,7 @@ async def post_act(
                 async with sess.post(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                    json={"bot_id": str(bot_id), "reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)}
+                    json={"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id), "bot": bot_data}
                 ) as resp:
                     msg += f"{list['name']} -> {resp.status}"
                     try:
