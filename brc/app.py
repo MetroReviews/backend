@@ -74,18 +74,6 @@ async def brc_index():
 async def lists():
     return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state).order_by(tables.BotList.id, ascending=True)
 
-@app.get("/actions")
-async def get_actions():
-    """
-``list_source`` will not be present if it is not relevant
-    """
-    actions = await tables.BotAction.select().order_by(tables.BotAction.action_time, ascending=False)
-
-    for action in actions:
-        action["bot_id"] = str(action["bot_id"])
-    
-    return actions
-
 class BotPost(pydantic.BaseModel):
     bot_id: str
     username: str
@@ -109,8 +97,27 @@ async def get_bot(id: int) -> Bot:
     return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
 @app.get("/bots", response_model=list[Bot])
-async def get_queue() -> list[Bot]:
+async def get_queue(list_id: int, auth: str = Depends(auth_header)) -> list[Bot]:
+    if (auth := await _auth(list_id, auth)):
+        return auth 
+
     return await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
+
+class Action(pydantic.BaseModel):
+    id: int
+    bot_id: str
+    action: tables.Action
+    reason: str
+    reviewer: str 
+    action_time: datetime.datetime
+    list_source: int | None = None
+
+@app.get("/actions", response_model=list[Action])
+async def get_actions() -> list[Action]:
+    """
+``list_source`` will not be present in all cases.
+    """
+    return await tables.BotAction.select().order_by(tables.BotAction.action_time, ascending=False)
     
 good_states = (tables.ListState.PENDING_API_SUPPORT, tables.ListState.SUPPORTED)
 
@@ -250,7 +257,7 @@ async def post_act(
     
     # Post intent to actions
     await tables.BotAction.insert(
-        tables.BotAction(bot_id=bot_id, action=action, action_time=datetime.datetime.now(), list_source=None)
+        tables.BotAction(bot_id=bot_id, action=action, action_time=datetime.datetime.now(), list_source=bot_data["list_source"])
     )
     
     embed = discord.Embed(title="Bot Info", description=f"**Bot ID**: {bot_id}\n\n**Reason:** {reason}", color=discord.Color.green())

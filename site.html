@@ -33,26 +33,50 @@
         }
     </style>
     <body>
-        <h1>Metro Bots</h1>
+        <h1>Metro Bot Reviews</h1>
+        <h3>Documentation: <a href="/docs">https://metrobots.xyz/docs</a></h3>
+        <h3>Github: <a href="/docs">https://github.com/MetroReviews</a></h3>
         <details open>
             <summary>Who are we</summary>
             <p>
-                Metro Bots is a consortium of bot lists to allow easier and quicker bot reviews and approvals<br/><br/>
+                Metro Bot Reviews is a consortium of bot lists to allow easier and quicker bot reviews and approvals<br/><br/>
 
                 Basically, if you add to <em>one</em> bot list on the network, it automatically gets added to <em>all</em> lists on the network<br/><br/>
                 
-                When your bot is approved, it gets approved on all lists
+                When your bot is approved, it gets approved on all lists.
             </p>
         </details>
         <details>
-            <summary>Lists</summary>
-            <strong>Metro Bots is always happy to get new lists to partner with. Here is our current ever-growing list:</strong>
+            <summary>Lists And Rules</summary>
+            <strong>Metro Bot Reviews is always happy to get new lists to partner with. Here is our current ever-growing list:</strong>
             <ol id="supported-lists">
             </ol>
+            <h3>Our Listing Rules</h3>
+            Any list that wants to enroll in our services should meet the following rules and requirements:<br/>
+            <ul>
+                <li>List Etiquette: <a href="https://github.com/MetroReviews/support/blob/main/bot-lists/Etiquette.md">https://github.com/MetroReviews/support/blob/main/bot-lists/Etiquette.md</a></li>
+                <li>List Requirements: <a href="https://github.com/MetroReviews/support/blob/main/bot-lists/Requirements.md">https://github.com/MetroReviews/support/blob/main/bot-lists/Requirements.md</a></li>
+            </ul>                        
+            <h3>How to Apply</h3>
+            If you would like to enroll your Bot List in our services please contact Toxic Dev#5936 or Rootspring#6701 ✊👌🏻             
         </details>
         <details>
             <summary>Our Discord Server</summary>
-            <p>You can find our discord server here: <a href="https://discord.gg/TYBGxncd5j">https://discord.gg/TYBGxncd5j</a></p>
+            <p>
+                You can find our discord server here: <a href="https://discord.gg/TYBGxncd5j">https://discord.gg/TYBGxncd5j</a>
+                <br/>
+                <br/>
+                This is also where all bots will be tested (for transparency purposes, this is public)
+            </p>
+        </details>
+        <details>
+            <summary>Our Docs</summary>
+            <p>
+                You may find our API documentation at <a href="/docs">https://metrobots.xyz/docs</a><br/><br/>
+
+                Some API endpoints require authentication. You will recieve your lists <code>secret key</code> and ID when you apply.<br/>
+                There is currently <em>no</em> other way to use these endpoints without being a member.
+            </p>
         </details>
         <details>
             <summary>FAQ</summary>
@@ -66,6 +90,13 @@
         </details>
     </body>
     <script>
+        ListState = {
+            0: "PENDING_API_SUPPORT",
+            1: "SUPPORTED",
+            2: "DEFUNCT",
+            3: "BLACKLISTED"
+        }
+
         function docReady(callback){
             // in case the document is already rendered
             if (document.readyState!='loading') callback();
@@ -82,7 +113,7 @@
             if(listData.ok) {
                 let listArr = await listData.json()
                 listArr.forEach(el => {
-                    document.querySelector("#supported-lists").innerHTML += `<li>${el.name}: ${el.state}</li>`
+                    document.querySelector("#supported-lists").innerHTML += `<li>${el.name}: ${ListState[el.state]}</li>`
                 })
             }
         })
