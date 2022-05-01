@@ -4,7 +4,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
     <style>
-        h1, h2, h3, h4, h5, h6, p, pre, details, summary, span {
+        h1, h2, h3, h4, h5, h6, p, pre, details, summary, span, #preview {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
         }
 
@@ -30,6 +30,11 @@
         /*Override background-color for summary*/
         details summary {
             background-color: #f4f0ec;
+        }
+
+        #preview {
+            padding: 3px;
+            margin: 3px;
         }
     </style>
     <body>
@@ -88,7 +93,10 @@
                 That being said, you can mandate it on your own list but metro reviews won't really follow that when reviewing bots.              
             </p>
         </details>
+        <div id="preview">
+        </div>    
     </body>
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.14/marked.min.js"></script>
     <script>
         ListState = {
             0: "PENDING_API_SUPPORT",
@@ -109,8 +117,28 @@
             });
         }
 
+        async function preview() {
+            const urlSearchParams = new URLSearchParams(window.location.search);
+            let preview = urlSearchParams.get("preview");
+            if(preview) {
+                let previewData = await fetch(`/bots/${preview}`);
+                let previewJson = await previewData.json();
+                console.log(previewJson)
+                if(!previewData.ok) {
+                    document.querySelector("#preview").innerHTML = `Could not render a preview: ${JSON.stringify(previewJson)}`;
+                } else {
+                    if(!previewJson) {
+                        document.querySelector("#preview").innerHTML = `Could not render a preview as the requested bot wasnt found`;
+                    } else {
+                        document.querySelector("#preview").innerHTML = `<span class="center">${marked.parse(previewJson.description)}</span>`;
+                    }
+                }
+            }
+        }
+
         docReady(async () => {
             let listData = await fetch("/lists")
+            preview()
             if(listData.ok) {
                 let listArr = await listData.json()
                 listArr.forEach(el => {

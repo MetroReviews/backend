@@ -4,6 +4,7 @@ import json
 import uuid
 import aiohttp
 import discord
+import secrets as _secrets
 from discord.ext import commands
 from fastapi.responses import HTMLResponse, ORJSONResponse
 from fastapi.security.api_key import APIKeyHeader
@@ -72,7 +73,7 @@ async def brc_index():
     return HTMLResponse(site_html)
 
 @app.get("/lists")
-async def lists():
+async def get_all_lists():
     return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state).order_by(tables.BotList.id, ascending=True)
 
 class BotPost(pydantic.BaseModel):
@@ -91,7 +92,46 @@ class Bot(BotPost):
     list_source: uuid.UUID
     added_at: datetime.datetime
 
+class ListUpdate(pydantic.BaseModel):
+    name: str | None = None
+    claim_bot_api: str | None = None
+    unclaim_bot_api: str | None = None
+    approve_bot_api: str | None = None
+    deny_bot_api: str | None = None
+    reset_secret_key: bool = False
+
 auth_header = APIKeyHeader(name='Authorization')
+
+@app.patch("/lists/{list_id}")
+async def update_list(list_id: uuid.UUID, update: ListUpdate, auth: str = Depends(auth_header)):
+    if (auth := await _auth(list_id, auth)):
+        return auth 
+    
+    has_updated = 0
+
+    if update.name:
+        await tables.BotList.update(name=update.name).where(tables.BotList.id == list_id)
+        has_updated += 1
+    if update.claim_bot_api:
+        await tables.BotList.update(claim_bot_api=update.claim_bot_api).where(tables.BotList.id == list_id)
+        has_updated += 1
+    if update.unclaim_bot_api:
+        await tables.BotList.update(unclaim_bot_api=update.unclaim_bot_api).where(tables.BotList.id == list_id)
+        has_updated += 1
+    if update.approve_bot_api:
+        await tables.BotList.update(approve_bot_api=update.approve_bot_api).where(tables.BotList.id == list_id)
+        has_updated += 1
+    if update.deny_bot_api:
+        await tables.BotList.update(deny_bot_api=update.deny_bot_api).where(tables.BotList.id == list_id)
+        has_updated += 1
+    
+    if has_updated and update.reset_secret_key:
+        return ORJSONResponse({"error": "Cannot reset secret key while updating other fields"}, status_code=400)
+    elif update.reset_secret_key:
+        key = _secrets.token_urlsafe()
+        await tables.BotList.update(secret_key=key).where(tables.BotList.id == list_id)
+        return {"secret_key": key}
+    return {"has_updated": has_updated}
 
 @app.get("/bots/{id}", response_model=Bot)
 async def get_bot(id: int) -> Bot:
@@ -140,6 +180,13 @@ async def _auth(list_id: uuid.UUID, key: str) -> ORJSONResponse | None:
     if list["state"] not in good_states:
         return ORJSONResponse({"error": "List blacklisted, defunct or in an unknown state"}, status_code=401)
 
+emotes = {
+    "id": "<:idemote:912034927443320862>",
+    "bot": "<:bot:970349895829561420>",
+    "crown": "<:owner:912356178833596497>",
+    "invite": "<:plus:912363980490702918>" 
+}
+
 @app.post("/bots")
 async def post_bots(request: Request, _bot: BotPost, list_id: uuid.UUID, auth: str = Depends(auth_header)):
     """
@@ -162,6 +209,9 @@ All optional fields are actually *optional* and does not need to be posted
     if len(curr_bot) > 0:
         return ORJSONResponse({"error": "Bot already in queue"}, status_code=400)
 
+    if _bot.invite and not _bot.invite.startswith("https://"):
+        return ORJSONResponse({"error": "Invalid invite URL"}, status_code=400)
+
     await tables.BotQueue.insert(
         tables.BotQueue(
             bot_id=bot_id, 
@@ -178,11 +228,16 @@ All optional fields are actually *optional* and does not need to be posted
         )
     )
 
-    # TODO: Add bot add propogation in final scope plans if this is successful
-    embed = discord.Embed(title="Bot Added To Queue", description=f"**Bot ID**: {bot_id}\n**Username:** {_bot.username}", color=discord.Color.green())
-    c = bot.get_channel(secrets["queue_channel"])
-    await c.send(f"<@&{secrets['reviewer']}>", embed=embed)
+    if not _bot.invite:
+        invite = f"https://discordapp.com/oauth2/authorize?client_id={bot_id}&scope=bot%20applications.commands&permissions=0"
+    else:
+        invite = _bot.invite
 
+    # TODO: Add bot add propogation in final scope plans if this is successful
+    embed = discord.Embed(title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})", color=discord.Color.green())
+    c = bot.get_channel(secrets["queue_channel"])
+    await c.send(f"<@&{secrets['test_ping_role'] or secrets['reviewer']}>", embed=embed)
+    return {}
 
 class PrefixSupport(discord.ui.View):
     def __init__(self, modal: discord.ui.Modal):
@@ -201,8 +256,6 @@ def mr_command(modal_class):
             await ctx.send("To continue, click the below button", view=PrefixSupport(modal_class))
         return f
     return wrapper
-
-
 
 class FSnowflake():
     """Blame discord"""

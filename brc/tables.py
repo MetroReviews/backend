@@ -42,6 +42,7 @@ class BotList(Table, tablename="bot_list"):
     unclaim_bot_api = Text(null=False)
     approve_bot_api = Text(null=False)
     deny_bot_api = Text(null=False)
+    domain = Text(null=False)
     secret_key = Text(null=False, default=secrets.token_urlsafe)
 
 class BotAction(Table, tablename="bot_action"):

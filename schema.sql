@@ -10,6 +10,7 @@ CREATE TABLE bot_list (
     unclaim_bot_api text DEFAULT '' NOT NULL,
     approve_bot_api text DEFAULT '' NOT NULL,
     deny_bot_api text DEFAULT '' NOT NULL,
+    domain text not null default '#',
     secret_key text DEFAULT 'default' NOT NULL
 );
 
