@@ -3,7 +3,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE bot_list (
-    id serial primary key,
+    id uuid primary key default uuid_generate_v4(),
     name text DEFAULT '' NOT NULL,
     state integer not null default 0,
     claim_bot_api text DEFAULT '' NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE bot_list (
 );
 
 CREATE TABLE bot_queue (
-    bot_id bigint NOT NULL,
+    bot_id bigint PRIMARY KEY,
     username text DEFAULT ''::text NOT NULL,
     banner text DEFAULT ''::text,
     description text DEFAULT ''::text NOT NULL,
@@ -23,22 +23,20 @@ CREATE TABLE bot_queue (
     invite text DEFAULT ''::text,
     added_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     state integer DEFAULT 0 NOT NULL,
-    list_source integer,
+    list_source uuid not null,
     owner bigint DEFAULT 0 NOT NULL,
     extra_owners bigint[] not null default '{}',
-    CONSTRAINT bot_queue_pkey PRIMARY KEY (bot_id),
     CONSTRAINT bot_queue_list_source_fkey FOREIGN KEY (list_source) REFERENCES public.bot_list(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE bot_action (
-    id serial not null,
+    id uuid primary key default uuid_generate_v4(),
     bot_id bigint not null,
     action integer DEFAULT 0 NOT NULL,
     reason text DEFAULT ''::text NOT NULL,
     reviewer text DEFAULT ''::text NOT NULL,
     action_time timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    list_source integer,
-    CONSTRAINT bot_action_pkey PRIMARY KEY (bot_id),
+    list_source uuid not null,
     CONSTRAINT bot_action_list_source_fkey FOREIGN KEY (list_source) REFERENCES public.bot_list(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 

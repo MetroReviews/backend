@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+import uuid
 import aiohttp
 import discord
 from discord.ext import commands
@@ -87,7 +88,7 @@ class BotPost(pydantic.BaseModel):
 
 class Bot(BotPost):
     state: tables.State
-    list_source: int
+    list_source: uuid.UUID
     added_at: datetime.datetime
 
 auth_header = APIKeyHeader(name='Authorization')
@@ -97,7 +98,7 @@ async def get_bot(id: int) -> Bot:
     return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
 @app.get("/bots", response_model=list[Bot])
-async def get_queue(list_id: int, auth: str = Depends(auth_header)) -> list[Bot]:
+async def get_queue(list_id: uuid.UUID, auth: str = Depends(auth_header)) -> list[Bot]:
     if (auth := await _auth(list_id, auth)):
         return auth 
 
@@ -110,18 +111,26 @@ class Action(pydantic.BaseModel):
     reason: str
     reviewer: str 
     action_time: datetime.datetime
-    list_source: int | None = None
+    list_source: uuid.UUID
 
 @app.get("/actions", response_model=list[Action])
-async def get_actions() -> list[Action]:
+async def get_actions(offset: int = 0, limit: int = 50) -> list[Action]:
     """
+Returns a list of review action (such as claim bot, unclaim bot, approve bot and deny bot etc.)
+
 ``list_source`` will not be present in all cases.
+
+**This is purely to allow Metro Review lists to debug their code**
+
+Paginated using ``limit`` (how many rows to return at maximum) and ``offset`` (how many rows to skip). Maximum limit is 200
     """
-    return await tables.BotAction.select().order_by(tables.BotAction.action_time, ascending=False)
+    if limit > 200:
+        return []
+    return await tables.BotAction.select().limit(limit).offset(offset).order_by(tables.BotAction.action_time, ascending=False)
     
 good_states = (tables.ListState.PENDING_API_SUPPORT, tables.ListState.SUPPORTED)
 
-async def _auth(list_id: int, key: str) -> ORJSONResponse | None:
+async def _auth(list_id: uuid.UUID, key: str) -> ORJSONResponse | None:
     list = await tables.BotList.select(tables.BotList.secret_key, tables.BotList.state).where(tables.BotList.id == list_id).first()
     if not list:
         return ORJSONResponse({"error": "List not found"}, status_code=404)
@@ -132,7 +141,7 @@ async def _auth(list_id: int, key: str) -> ORJSONResponse | None:
         return ORJSONResponse({"error": "List blacklisted, defunct or in an unknown state"}, status_code=401)
 
 @app.post("/bots")
-async def post_bots(request: Request, _bot: BotPost, list_id: int, auth: str = Depends(auth_header)):
+async def post_bots(request: Request, _bot: BotPost, list_id: uuid.UUID, auth: str = Depends(auth_header)):
     """
 All optional fields are actually *optional* and does not need to be posted
 
@@ -222,16 +231,29 @@ async def post_act(
     if not isinstance(interaction.user, discord.Member):
         return
     
+    if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
+        return await interaction.response.send_message("You must have the `Reviewer` role to use this command.")
+    
     bot_data = await tables.BotQueue.select().where(tables.BotQueue.bot_id == bot_id).first()
 
     if not bot_data:
-        return await interaction.response.send_message(f"This bot (`{bot_id}`) cannot be found")
-    
+        return await interaction.response.send_message(f"This bot (`{bot_id}`) cannot be found")        
+
     if action == tables.Action.CLAIM and bot_data["state"] != tables.State.PENDING:
         return await interaction.response.send_message("This bot cannot be claimed as it is not pending review?")
+    elif action == tables.Action.UNCLAIM and bot_data["state"] != tables.State.UNDER_REVIEW:
+        return await interaction.response.send_message("This bot cannot be unclaimed as it is not under review?")
 
-    if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
-        return await interaction.response.send_message("You must have the `Reviewer` role to use this command.")
+    if action == tables.Action.CLAIM:
+        cls = tables.State.UNDER_REVIEW
+    elif action == tables.Action.UNCLAIM:
+        cls = tables.State.PENDING
+    elif action == tables.Action.APPROVE:
+        cls = tables.State.APPROVED
+    elif action == tables.Action.DENY:
+        cls = tables.State.DENIED
+    
+    await tables.BotQueue.update(state=cls).where(tables.BotQueue.bot_id == bot_id)
 
     msg = f"**{action.name.title()}!**\n"
 
@@ -244,7 +266,7 @@ async def post_act(
                 async with sess.post(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                    json=bot_data | {"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)} | {"added_at": str(bot_data["added_at"])}
+                    json=bot_data | {"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)} | {"added_at": str(bot_data["added_at"]), "list_source": str(bot_data["list_source"])}
                 ) as resp:
                     msg += f"{list['name']} -> {resp.status}"
                     try:
@@ -273,7 +295,6 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
         except:
             return await interaction.response.send_message("Bot ID invalid") # Don't respond, so it gives error on their side
         
-
         list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.claim_bot_api, tables.BotList.secret_key)
 
         return await post_act(interaction, list_info, tables.Action.CLAIM, "claim_bot_api", bot_id, "STUB_REASON")
