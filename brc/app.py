@@ -74,7 +74,7 @@ async def brc_index():
 
 @app.get("/lists")
 async def get_all_lists():
-    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state).order_by(tables.BotList.id, ascending=True)
+    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.domain, tables.BotList.state).order_by(tables.BotList.id, ascending=True)
 
 class BotPost(pydantic.BaseModel):
     bot_id: str
@@ -101,6 +101,7 @@ class Bot(BotPost):
 
 class ListUpdate(pydantic.BaseModel):
     name: str | None = None
+    domain: str | None = None
     claim_bot_api: str | None = None
     unclaim_bot_api: str | None = None
     approve_bot_api: str | None = None
@@ -114,23 +115,29 @@ async def update_list(list_id: uuid.UUID, update: ListUpdate, auth: str = Depend
     if (auth := await _auth(list_id, auth)):
         return auth 
     
-    has_updated = 0
+    has_updated = []
 
     if update.name:
         await tables.BotList.update(name=update.name).where(tables.BotList.id == list_id)
-        has_updated += 1
+        has_updated.append("name")
     if update.claim_bot_api:
         await tables.BotList.update(claim_bot_api=update.claim_bot_api).where(tables.BotList.id == list_id)
-        has_updated += 1
+        has_updated.append("claim_bot_api")
     if update.unclaim_bot_api:
         await tables.BotList.update(unclaim_bot_api=update.unclaim_bot_api).where(tables.BotList.id == list_id)
-        has_updated += 1
+        has_updated.append("unclaim_bot_api")
     if update.approve_bot_api:
         await tables.BotList.update(approve_bot_api=update.approve_bot_api).where(tables.BotList.id == list_id)
-        has_updated += 1
+        has_updated.append("approve_bot_api")
     if update.deny_bot_api:
         await tables.BotList.update(deny_bot_api=update.deny_bot_api).where(tables.BotList.id == list_id)
-        has_updated += 1
+        has_updated.append("deny_bot_api")
+    if update.domain:
+        # Remove trailing /
+        if update.domain.endswith("/"):
+            update.domain = update.domain[:-1]
+        await tables.BotList.update(domain=update.domain).where(tables.BotList.id == list_id)
+        has_updated.append("domain")
     
     if has_updated and update.reset_secret_key:
         return ORJSONResponse({"error": "Cannot reset secret key while updating other fields"}, status_code=400)
@@ -284,7 +291,7 @@ All optional fields are actually *optional* and does not need to be posted
         invite = _bot.invite
 
     # TODO: Add bot add propogation in final scope plans if this is successful
-    embed = discord.Embed(title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
+    embed = discord.Embed(url=f"https://metrobots.xyz?preview={bot_id}", title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
     c = bot.get_channel(secrets["queue_channel"])
     await c.send(f"<@&{secrets['test_ping_role'] or secrets['reviewer']}>", embed=embed)
     return {"removed": rem}
