@@ -237,9 +237,11 @@ All optional fields are actually *optional* and does not need to be posted
                 _bot.support = None
                 rem.append("support")
     
-    # Default
+    # Ensure add bot across lists *works*
     if _bot.tags:
-        _bot.tags.append("utility")
+        _bot.tags = [tag.lower() for tag in _bot.tags]
+        if "utility" not in _bot.tags:
+            _bot.tags.append("utility")
     else:
         _bot.tags = ["utility"]
 
