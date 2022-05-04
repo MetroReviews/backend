@@ -2,7 +2,7 @@ import secrets
 import enum
 
 from piccolo.table import Table
-from piccolo.columns import Text, Timestamptz, Integer, ForeignKey, UUID, BigInt, Array
+from piccolo.columns import Text, Timestamptz, Integer, ForeignKey, UUID, BigInt, Array, Boolean
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.columns.base import OnDelete, OnUpdate
 
@@ -61,6 +61,13 @@ class BotQueue(Table, tablename="bot_queue"):
     description = Text(null=False)
     long_description = Text(null=False)
     website = Text(null=True)
+    support = Text(null=True)
+    donate = Text(null=True)
+    library = Text(null=True)
+    nsfw = Boolean(null=False, default=False)
+    prefix = Text(null=True)
+    tags = Array(base_column=Text(null=False), default=[])
+    review_note = Text(null=True)
     invite = Text(null=True)
     added_at = Timestamptz(null=False, default=TimestamptzNow())
     state = Integer(choices=State, default=State.PENDING)
