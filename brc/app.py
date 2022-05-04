@@ -192,7 +192,7 @@ emotes = {
     "bot": "<:bot:970349895829561420>",
     "crown": "<:owner:912356178833596497>",
     "invite": "<:plus:912363980490702918>",
-    "flag": "<:flag:912366984421855252>" 
+    "note": "<:activity:912031377422172160>" 
 }
 
 @app.post("/bots")
@@ -236,6 +236,12 @@ All optional fields are actually *optional* and does not need to be posted
                 # We tried working around it, now we just remove the bad support
                 _bot.support = None
                 rem.append("support")
+    
+    # Default
+    if _bot.tags:
+        _bot.tags.append("utility")
+    else:
+        _bot.tags = ["utility"]
 
     curr_bot = await tables.BotQueue.select(tables.BotQueue.bot_id).where(tables.BotQueue.bot_id == bot_id)
 
@@ -276,7 +282,7 @@ All optional fields are actually *optional* and does not need to be posted
         invite = _bot.invite
 
     # TODO: Add bot add propogation in final scope plans if this is successful
-    embed = discord.Embed(title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['flag']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
+    embed = discord.Embed(title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
     c = bot.get_channel(secrets["queue_channel"])
     await c.send(f"<@&{secrets['test_ping_role'] or secrets['reviewer']}>", embed=embed)
     return {"removed": rem}
