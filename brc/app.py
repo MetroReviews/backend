@@ -86,6 +86,13 @@ class BotPost(pydantic.BaseModel):
     invite: str | None = None
     owner: str
     extra_owners: list[str]
+    support: str | None = None
+    donate: str | None = None
+    library: str | None = None
+    nsfw: bool | None = False
+    prefix: str | None = None
+    tags: list[str] | None = None
+    review_note: str | None = None
 
 class Bot(BotPost):
     state: tables.State
@@ -184,7 +191,8 @@ emotes = {
     "id": "<:idemote:912034927443320862>",
     "bot": "<:bot:970349895829561420>",
     "crown": "<:owner:912356178833596497>",
-    "invite": "<:plus:912363980490702918>" 
+    "invite": "<:plus:912363980490702918>",
+    "flag": "<:flag:912366984421855252>" 
 }
 
 @app.post("/bots")
@@ -197,12 +205,37 @@ All optional fields are actually *optional* and does not need to be posted
     if (auth := await _auth(list_id, auth)):
         return auth 
     
+    rem = []
+    
     try:
         bot_id = int(_bot.bot_id)
         owner = int(_bot.owner)
         extra_owners = [int(v) for v in _bot.extra_owners]
     except:
         return ORJSONResponse({"error": "Invalid bot fields"}, status_code=400)
+    
+    if _bot.banner:
+        if not _bot.banner.startswith("https://"):
+            _bot.banner = bot.banner.replace("http://", "https://")
+            if not _bot.banner.startswith("https://"):
+                # We tried working around it, now we just remove the bad banner
+                _bot.banner = None
+                rem.append("banner")
+    if _bot.website:
+        if not _bot.website.startswith("https://"):
+            _bot.website = _bot.website.replace("http://", "https://")
+            if not _bot.website.startswith("https://"):
+                # We tried working around it, now we just remove the bad website
+                _bot.website = None
+                rem.append("website")
+    
+    if _bot.support:
+        if not _bot.support.startswith("https://"):
+            _bot.support = _bot.support.replace("http://", "https://")
+            if not _bot.support.startswith("https://"):
+                # We tried working around it, now we just remove the bad support
+                _bot.support = None
+                rem.append("support")
 
     curr_bot = await tables.BotQueue.select(tables.BotQueue.bot_id).where(tables.BotQueue.bot_id == bot_id)
 
@@ -210,7 +243,9 @@ All optional fields are actually *optional* and does not need to be posted
         return ORJSONResponse({"error": "Bot already in queue"}, status_code=400)
 
     if _bot.invite and not _bot.invite.startswith("https://"):
-        return ORJSONResponse({"error": "Invalid invite URL"}, status_code=400)
+        # Just remove bad invite
+        _bot.invite = None
+        rem.append("invite")
 
     await tables.BotQueue.insert(
         tables.BotQueue(
@@ -223,6 +258,13 @@ All optional fields are actually *optional* and does not need to be posted
             website=_bot.website,
             invite=_bot.invite,
             owner=owner,
+            support=_bot.support,
+            donate=_bot.donate,
+            library=_bot.library,
+            nsfw=_bot.nsfw,
+            prefix=_bot.prefix,
+            tags=_bot.tags,
+            review_note=_bot.review_note,
             extra_owners=extra_owners,
             state=tables.State.PENDING
         )
@@ -234,10 +276,10 @@ All optional fields are actually *optional* and does not need to be posted
         invite = _bot.invite
 
     # TODO: Add bot add propogation in final scope plans if this is successful
-    embed = discord.Embed(title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})", color=discord.Color.green())
+    embed = discord.Embed(title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['flag']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
     c = bot.get_channel(secrets["queue_channel"])
     await c.send(f"<@&{secrets['test_ping_role'] or secrets['reviewer']}>", embed=embed)
-    return {}
+    return {"removed": rem}
 
 class PrefixSupport(discord.ui.View):
     def __init__(self, modal: discord.ui.Modal):
