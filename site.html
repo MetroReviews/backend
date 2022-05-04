@@ -115,8 +115,7 @@
                 That being said, you can mandate it on your own list but metro reviews won't really follow that when reviewing bots.              
             </p>
         </details>
-        <div id="preview">
-        </div>    
+        <span id="preview-after"></span>
     </body>
     <script src="https://cdn.jsdelivr.net/npm/marked@4.0.14/marked.min.js"></script>
     <script>
@@ -153,6 +152,9 @@
             const urlSearchParams = new URLSearchParams(window.location.search);
             let preview = urlSearchParams.get("preview");
             if(preview) {
+                let previewEl = document.createElement("div");
+                previewEl.id = "preview"
+                document.querySelector("#preview-after").after(previewEl);
                 let previewData = await fetch(`/bots/${preview}`);
                 let previewJson = await previewData.json();
                 console.log(previewJson)
@@ -168,7 +170,7 @@
                         <span class="info-pane">
                             <span class="info"><strong>Banner URL: </strong>${previewJson.banner || "No banner URL"}</span>
                             <span class="info"><strong>State: </strong>${previewJson.state}</span>
-                            <span class="info"><strong>From List: </strong>${getList(previewJson.list_source).domain}</span>
+                            <span class="info"><strong>From List: </strong><a href="${getList(previewJson.list_source).domain}">${getList(previewJson.list_source).name}</a></span>
                         </span>
                         <span class="long-description">${marked.parse(previewJson.long_description)}</span>
                         `;
@@ -183,7 +185,7 @@
             if(listData.ok) {
                 lists = await listData.json()
                 lists.forEach(el => {
-                    document.querySelector("#supported-lists").innerHTML += `<li>${el.name}: ${ListState[el.state]}</li>`
+                    document.querySelector("#supported-lists").innerHTML += `<li><a href="${el.domain}">${el.name}</a>: ${ListState[el.state]}</li>`
                 })
             }
         })
