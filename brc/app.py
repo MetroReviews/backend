@@ -320,6 +320,28 @@ class FSnowflake():
         self.id: int = id
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+async def queue(interaction: discord.Interaction):
+    """Bot queue"""
+    states = {}
+    for state in list(tables.State):
+        states[state] = await tables.BotQueue.select(tables.BotQueue.bot_id, tables.BotQueue.username).where(tables.BotQueue.state == state)
+    msg = []
+    msg_index = -1
+    for key, bots in states.items():
+        if not len(bots):
+            continue
+        msg.append(f"**{key.name} ({key.value})**\n\n")
+        msg_index += 1
+        for bot in bots:
+            if len(msg) > 1900:
+                msg.append("")
+                msg_index += 1
+            msg[msg_index] += f"{bot['bot_id']} ({bot['username']})\n"
+    await interaction.response.send_message(msg[0])
+    for msg in msg[1:]:
+        await interaction.followup.send(msg)
+
+@bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
 async def sync(interaction: discord.Interaction):
     """Syncs all commands"""
     await bot.tree.sync(guild=FSnowflake(id=secrets["gid"]))
