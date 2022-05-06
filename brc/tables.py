@@ -74,3 +74,4 @@ class BotQueue(Table, tablename="bot_queue"):
     list_source = ForeignKey(null=False, references=BotList, on_delete=OnDelete.cascade, on_update=OnUpdate.cascade)
     owner = BigInt(null=False)
     extra_owners = Array(base_column=BigInt(null=False), default=[])
+    reviewer = BigInt(null=True)

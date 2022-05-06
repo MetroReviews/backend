@@ -33,8 +33,9 @@
         }
 
         #preview {
-            padding: 3px;
-            margin: 3px;
+            margin-top: 30px;
+            overflow-y: scroll;
+            overflow-x: hidden;
         }
 
         .desc {
@@ -46,7 +47,8 @@
             width: 100%;
             height: 100%;
             border: solid thin;
-            background-color: #D3D3D3;
+            background-color: white;
+            word-wrap: break-word;
         }
 
         #prev-text {
@@ -70,7 +72,8 @@
 
                 Basically, if you add to <em>one</em> bot list on the network, it automatically gets added to <em>all</em> lists on the network<br/><br/>
                 
-                When your bot is approved, it gets approved on all lists.
+                When your bot is approved, it gets approved on all lists on the network hence reducing the work you have to do to get your bot visible
+                and especially grow.
             </p>
         </details>
         <details>
@@ -90,7 +93,7 @@
         <details>
             <summary>Our Discord Server</summary>
             <p>
-                You can find our discord server here: <a href="https://discord.gg/TYBGxncd5j">https://discord.gg/TYBGxncd5j</a>
+                You can find our discord server here: <a href="https://fateslist.xyz/server/969274747093397555">https://fateslist.xyz/server/969274747093397555</a>
                 <br/>
                 <br/>
                 This is also where all bots will be tested (for transparency purposes, this is public)
@@ -125,6 +128,13 @@
             2: "DEFUNCT",
             3: "BLACKLISTED",
             4: "UNCONFIRMED_ENROLLMENT"
+        }
+
+        State = {
+            0: "PENDING",
+            1: "UNDER_REVIEW",
+            2: "APPROVED",
+            3: "DENIED"
         }
 
         var lists = []
@@ -169,7 +179,8 @@
                         <span class="desc">${marked.parse(previewJson.description)}</span>
                         <span class="info-pane">
                             <span class="info"><strong>Banner URL: </strong>${previewJson.banner || "No banner URL"}</span>
-                            <span class="info"><strong>State: </strong>${previewJson.state}</span>
+                            <span class="info"><strong>Website: </strong>${previewJson.website || "No website found"}</span>
+                            <span class="info"><strong>State: </strong>${previewJson.state} (${State[previewJson.state]})</span>
                             <span class="info"><strong>From List: </strong><a href="${getList(previewJson.list_source).domain}">${getList(previewJson.list_source).name}</a></span>
                         </span>
                         <span class="long-description">${marked.parse(previewJson.long_description)}</span>

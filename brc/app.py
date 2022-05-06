@@ -350,12 +350,44 @@ async def post_act(
         return await interaction.response.send_message(f"This bot (`{bot_id}`) cannot be found")        
 
     if action == tables.Action.CLAIM and bot_data["state"] != tables.State.PENDING:
-        return await interaction.response.send_message("This bot cannot be claimed as it is not pending review?")
+        return await interaction.response.send_message("This bot cannot be claimed as it is not pending review? Maybe someone is testing it right noe?")
     elif action == tables.Action.UNCLAIM and bot_data["state"] != tables.State.UNDER_REVIEW:
         return await interaction.response.send_message("This bot cannot be unclaimed as it is not under review?")
 
     if action == tables.Action.CLAIM:
         cls = tables.State.UNDER_REVIEW
+        await tables.BotQueue.update(reviewer=interaction.user.id).where(tables.BotQueue.bot_id == bot_id)
+        
+        # Make new server using discord api
+        try:
+            created_guild = await bot.create_guild(name=f"{bot_id} testing")
+            channel = await created_guild.create_text_channel(name="do-not-delete-this-channel")
+            invite = await channel.create_invite(reason="Bot Reviewer invite")
+            await interaction.channel.send(f"**{interaction.user.mention}\nPlease join the following server to test the bot. If you do not do so within 1 minute (will increase, just for testing), this server will be deleted and the bot will be unclaimed!**\n\n{invite.url}")
+
+            async def _task(guild: discord.Guild, bot_id: int):
+                await asyncio.sleep(60)
+                cached_guild = bot.get_guild(guild.id)
+                if not cached_guild:
+                    return # All good
+                if not cached_guild.owner_id:
+                    return await _task(guild, bot_id)
+                if cached_guild.owner_id == bot.user.id:
+                    # Then the user has not joined the server in time
+                    try:
+                        await guild.delete()
+                    except discord.errors.Forbidden:
+                        return
+                    except Exception as exc:
+                        print(f"Failed to delete guild: {exc}")
+                    await interaction.channel.send(content=f"**{interaction.user.mention}\nYou have not joined the server in time. The bot will be unclaimed and the server has been deleted!**")
+                    await tables.BotQueue.update(state=tables.State.PENDING, reviewer=None).where(tables.BotQueue.bot_id == bot_id)
+            asyncio.create_task(_task(created_guild, bot_id))
+            print("Got here")
+
+        except Exception as exc:
+            return await interaction.response.send_message(f"Failed to create new server for testing: {exc}")
+
     elif action == tables.Action.UNCLAIM:
         cls = tables.State.PENDING
     elif action == tables.Action.APPROVE:
@@ -395,6 +427,7 @@ async def post_act(
     embed = discord.Embed(title="Bot Info", description=f"**Bot ID**: {bot_id}\n\n**Reason:** {reason}", color=discord.Color.green())
 
     await interaction.followup.send(msg, embeds=[embed])
+
 
 class Claim(discord.ui.Modal, title='Claim Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
@@ -484,4 +517,19 @@ async def on_ready():
     await bot.tree.sync(guild=FSnowflake(id=secrets["gid"]))
     for cmd in bot.tree.walk_commands():
         print(cmd.name)
-        
+    
+    for guild in bot.guilds:
+        if guild.owner_id == bot.user.id:
+            # Transfer ownership or delete
+            if len(guild.members) == 1:
+                await guild.delete()
+            else:
+                await guild.edit(owner=guild.members[0])
+                await guild.leave()
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    if member.guild.owner_id == bot.user.id:
+        # This is a bot owned guild, transfer ownership and leave
+        await member.guild.edit(owner=member)
+        await member.guild.leave()
