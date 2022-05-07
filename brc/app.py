@@ -430,7 +430,14 @@ async def post_act(
                 async with sess.post(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                    json=bot_data | {"reason": reason or "STUB_REASON", "reviewer": str(interaction.user.id)} | {"added_at": str(bot_data["added_at"]), "list_source": str(bot_data["list_source"])}
+                    json=bot_data | {
+                        "reason": reason or "STUB_REASON", 
+                        "reviewer": str(interaction.user.id), 
+                        "added_at": str(bot_data["added_at"]), 
+                        "list_source": str(bot_data["list_source"]),
+                        "owner": str(bot_data["owner"]),
+                        "extra_owners": [str(v) for v in bot_data["extra_owners"]]
+                    }
                 ) as resp:
                     msg += f"{list['name']} -> {resp.status}"
                     try:
