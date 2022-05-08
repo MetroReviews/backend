@@ -217,7 +217,11 @@ All optional fields are actually *optional* and does not need to be posted
     try:
         bot_id = int(_bot.bot_id)
         owner = int(_bot.owner)
-        extra_owners = [int(v) for v in _bot.extra_owners]
+        try:
+            extra_owners = [int(v) for v in _bot.extra_owners]
+        except:
+            extra_owners = []
+            rem.append("extra_owners")
     except:
         return ORJSONResponse({"error": "Invalid bot fields"}, status_code=400)
     
@@ -255,6 +259,7 @@ All optional fields are actually *optional* and does not need to be posted
     curr_bot = await tables.BotQueue.select(tables.BotQueue.bot_id).where(tables.BotQueue.bot_id == bot_id)
 
     if len(curr_bot) > 0:
+        print("Bot already exists")
         return ORJSONResponse({"error": "Bot already in queue"}, status_code=400)
 
     if _bot.invite and not _bot.invite.startswith("https://"):
