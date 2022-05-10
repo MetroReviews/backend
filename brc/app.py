@@ -399,6 +399,8 @@ async def post_act(
             invite = await channel.create_invite(reason="Bot Reviewer invite")
             await interaction.channel.send(f"**{interaction.user.mention}\nPlease join the following server to test the bot. If you do not do so within 1 minute (will increase, just for testing), this server will be deleted and the bot will be unclaimed!**\n\n{invite.url}")
 
+            await tables.BotQueue.update(invite_link=invite.url).where(tables.BotQueue.bot_id == bot_id)
+
             async def _task(guild: discord.Guild, bot_id: int):
                 await asyncio.sleep(60)
                 cached_guild = bot.get_guild(guild.id)
@@ -408,6 +410,7 @@ async def post_act(
                     return await _task(guild, bot_id)
                 if cached_guild.owner_id == bot.user.id:
                     # Then the user has not joined the server in time
+                    await tables.BotQueue.update(invite_link=None).where(tables.BotQueue.bot_id == bot_id)
                     try:
                         await guild.delete()
                     except discord.errors.Forbidden:
@@ -565,6 +568,13 @@ async def on_ready():
             if len(guild.members) == 1:
                 await guild.delete()
             else:
+                try:
+                    bot_id = int(guild.name.split(" ")[0])
+                    c = await guild.create_text_channel("never-remove-this")
+                    invite = await c.create_invite()
+                    await tables.BotQueue.update(invite_link=invite.url).where(tables.BotQueue.bot_id == bot_id)
+                except Exception as e:
+                    print(e)
                 await guild.edit(owner=guild.members[0])
                 await guild.leave()
 

@@ -75,3 +75,4 @@ class BotQueue(Table, tablename="bot_queue"):
     owner = BigInt(null=False)
     extra_owners = Array(base_column=BigInt(null=False), default=[])
     reviewer = BigInt(null=True)
+    invite_link = Text(null=True)
