@@ -74,7 +74,7 @@ async def brc_index():
 
 @app.get("/lists")
 async def get_all_lists():
-    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.domain, tables.BotList.state).order_by(tables.BotList.id, ascending=True)
+    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.description, tables.BotList.domain, tables.BotList.state, tables.BotList.icon).order_by(tables.BotList.id, ascending=True)
 
 class BotPost(pydantic.BaseModel):
     bot_id: str
@@ -101,12 +101,14 @@ class Bot(BotPost):
 
 class ListUpdate(pydantic.BaseModel):
     name: str | None = None
+    description: str | None = None
     domain: str | None = None
     claim_bot_api: str | None = None
     unclaim_bot_api: str | None = None
     approve_bot_api: str | None = None
     deny_bot_api: str | None = None
     reset_secret_key: bool = False
+    icon: str | None = None
 
 auth_header = APIKeyHeader(name='Authorization')
 
@@ -120,6 +122,13 @@ async def update_list(list_id: uuid.UUID, update: ListUpdate, auth: str = Depend
     if update.name:
         await tables.BotList.update(name=update.name).where(tables.BotList.id == list_id)
         has_updated.append("name")
+    if update.description:
+        await tables.BotList.update(name=update.name).where(tables.BotList.id == list_id)
+        has_updated.append("description")
+    if update.icon:
+        if update.icon.startswith("https://"):
+            await tables.BotList.update(icon=update.icon).where(tables.BotList.id == list_id)
+            has_updated.append("icon")
     if update.claim_bot_api:
         await tables.BotList.update(claim_bot_api=update.claim_bot_api).where(tables.BotList.id == list_id)
         has_updated.append("claim_bot_api")
@@ -260,7 +269,7 @@ All optional fields are actually *optional* and does not need to be posted
 
     if len(curr_bot) > 0:
         print("Bot already exists")
-        return ORJSONResponse({"error": "Bot already in queue"}, status_code=400)
+        return ORJSONResponse({"error": "Bot already in queue"}, status_code=405)
 
     if _bot.invite and not _bot.invite.startswith("https://"):
         # Just remove bad invite

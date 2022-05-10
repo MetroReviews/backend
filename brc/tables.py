@@ -38,6 +38,8 @@ class BotList(Table, tablename="bot_list"):
     id = UUID(primary_key=True)
     state = Integer(null=False, choices=ListState, default=ListState.PENDING_API_SUPPORT)
     name = Text(null=False)
+    description = Text(null=True)
+    icon = Text(null=True)
     claim_bot_api = Text(null=False)
     unclaim_bot_api = Text(null=False)
     approve_bot_api = Text(null=False)
