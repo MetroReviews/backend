@@ -365,6 +365,9 @@ async def post_act(
     bot_id: int,
     reason: str
 ):
+    if len(reason) < 5:
+        return await interaction.response.send_message("Reason too short (5 characters minimum)")
+
     if not isinstance(interaction.user, discord.Member):
         return
     
@@ -380,6 +383,10 @@ async def post_act(
         return await interaction.response.send_message("This bot cannot be claimed as it is not pending review? Maybe someone is testing it right noe?")
     elif action == tables.Action.UNCLAIM and bot_data["state"] != tables.State.UNDER_REVIEW:
         return await interaction.response.send_message("This bot cannot be unclaimed as it is not under review?")
+    elif action == tables.Action.APPROVE and bot_data["state"] != tables.State.UNDER_REVIEW:
+        return await interaction.response.send_message("This bot cannot be approved as it is not under review?")
+    elif action == tables.Action.DENY and bot_data["state"] != tables.State.UNDER_REVIEW:
+        return await interaction.response.send_message("This bot cannot be denied as it is not under review?")
 
     if action == tables.Action.CLAIM:
         cls = tables.State.UNDER_REVIEW
@@ -478,7 +485,7 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
 
 class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
-    reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000)
+    reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000, min_length=5)
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -493,7 +500,7 @@ class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
 
 class Approve(discord.ui.Modal, title='Approve Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
-    reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000)
+    reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000, min_length=5)
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -507,7 +514,7 @@ class Approve(discord.ui.Modal, title='Approve Bot'):
 
 class Deny(discord.ui.Modal, title='Deny Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
-    reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000)
+    reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000, min_length=5)
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
