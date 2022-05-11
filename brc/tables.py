@@ -78,3 +78,4 @@ class BotQueue(Table, tablename="bot_queue"):
     extra_owners = Array(base_column=BigInt(null=False), default=[])
     reviewer = BigInt(null=True)
     invite_link = Text(null=True)
+    cross_add = Boolean(null=False, default=True)

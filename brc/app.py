@@ -93,6 +93,7 @@ class BotPost(pydantic.BaseModel):
     prefix: str | None = None
     tags: list[str] | None = None
     review_note: str | None = None
+    cross_add: bool | None = True
 
 class Bot(BotPost):
     state: tables.State
@@ -166,6 +167,26 @@ async def get_queue(list_id: uuid.UUID, auth: str = Depends(auth_header)) -> lis
         return auth 
 
     return await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
+
+@app.get("/team")
+async def our_team():
+    guild = bot.get_guild(int(secrets["gid"]))
+    if not guild:
+        return {"detail": "Guild not found"}
+    
+    team = []
+
+    for member in guild.members:
+        if discord.utils.get(member.roles, id=int(secrets["reviewer"])):
+            team.append({
+                "username": member.name, 
+                "id": str(member.id), 
+                "avatar": member.avatar.url,
+                "is_list_owner": True if discord.utils.get(member.roles, id=int(secrets["list_owner"])) else False,
+                "sudo": True if discord.utils.get(member.roles, id=int(secrets["sudo"])) else False
+            })
+
+    return team
 
 class Action(pydantic.BaseModel):
     id: int
@@ -295,6 +316,7 @@ All optional fields are actually *optional* and does not need to be posted
             tags=_bot.tags,
             review_note=_bot.review_note,
             extra_owners=extra_owners,
+            cross_add=_bot.cross_add,
             state=tables.State.PENDING
         )
     )
