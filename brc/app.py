@@ -38,7 +38,7 @@ app = FastAPI(
                 site_name="BRC Admin",
                 production=True,
                 # Required when running under HTTPS:
-                allowed_hosts=['metrobots.xyz']
+                allowed_hosts=['catnip.metrobots.xyz']
             ),
         ),
     ],
@@ -174,13 +174,19 @@ async def our_team():
     team = []
 
     for member in guild.members:
+        list_roles = []
+        for role in member.roles:
+            if "list" in role.name.lower() and not role.name.lower().startswith("list"):
+                list_roles.append(role.name)
+
         if discord.utils.get(member.roles, id=int(secrets["reviewer"])):
             team.append({
                 "username": member.name, 
                 "id": str(member.id), 
                 "avatar": member.avatar.url,
                 "is_list_owner": True if discord.utils.get(member.roles, id=int(secrets["list_owner"])) else False,
-                "sudo": True if discord.utils.get(member.roles, id=int(secrets["sudo"])) else False
+                "sudo": True if discord.utils.get(member.roles, id=int(secrets["sudo"])) else False,
+                "roles": list_roles
             })
 
     return team
