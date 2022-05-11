@@ -162,10 +162,7 @@ async def get_bot(id: int) -> Bot:
     return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
 @app.get("/bots", response_model=list[Bot])
-async def get_queue(list_id: uuid.UUID, auth: str = Depends(auth_header)) -> list[Bot]:
-    if (auth := await _auth(list_id, auth)):
-        return auth 
-
+async def get_bots() -> list[Bot]:
     return await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
 
 @app.get("/team")
