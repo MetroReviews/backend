@@ -175,17 +175,27 @@ async def our_team():
 
     for member in guild.members:
         list_roles = []
+        is_list_owner = False
+        sudo = False
+        is_reviewer = False
         for role in member.roles:
             if "list" in role.name.lower() and not role.name.lower().startswith("list"):
                 list_roles.append(role.name)
 
-        if discord.utils.get(member.roles, id=int(secrets["reviewer"])):
+            if role.id == int(secrets["list_owner"]):
+                is_list_owner = True
+            elif role.id == int(secrets["sudo"]):
+                sudo = True
+            elif role.id == int(secrets["reviewer"]):
+                is_reviewer = True
+
+        if is_reviewer:
             team.append({
                 "username": member.name, 
                 "id": str(member.id), 
                 "avatar": member.avatar.url,
-                "is_list_owner": True if discord.utils.get(member.roles, id=int(secrets["list_owner"])) else False,
-                "sudo": True if discord.utils.get(member.roles, id=int(secrets["sudo"])) else False,
+                "is_list_owner": is_list_owner,
+                "sudo": sudo,
                 "roles": list_roles
             })
 
