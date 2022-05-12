@@ -99,6 +99,8 @@ class Bot(BotPost):
     state: tables.State
     list_source: uuid.UUID
     added_at: datetime.datetime
+    reviewer: str | None = None
+    invite_link: str | None = None
 
 class ListUpdate(pydantic.BaseModel):
     name: str | None = None
