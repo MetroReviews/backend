@@ -72,6 +72,10 @@ async def close_database_connection_pool():
 async def brc_index():
     return HTMLResponse(site_html)
 
+@app.get("/list/{id}")
+async def get_list(id: uuid.UUID):
+    return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.description, tables.BotList.domain, tables.BotList.state, tables.BotList.icon).where(tables.BotList.id == id).first()
+
 @app.get("/lists")
 async def get_all_lists():
     return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.description, tables.BotList.domain, tables.BotList.state, tables.BotList.icon).order_by(tables.BotList.id, ascending=True)
@@ -305,7 +309,7 @@ All optional fields are actually *optional* and does not need to be posted
 
     if len(curr_bot) > 0:
         print("Bot already exists")
-        return ORJSONResponse({"error": "Bot already in queue"}, status_code=405)
+        return ORJSONResponse({"error": "Bot already in queue"}, status_code=409)
 
     if _bot.invite and not _bot.invite.startswith("https://"):
         # Just remove bad invite
