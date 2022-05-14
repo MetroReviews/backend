@@ -79,3 +79,10 @@ class BotQueue(Table, tablename="bot_queue"):
     reviewer = BigInt(null=True)
     invite_link = Text(null=True)
     cross_add = Boolean(null=False, default=True)
+
+class Users(Table, tablename="users"):
+    user_id = BigInt(primary_key=True)
+    nonce = Text(null=False)
+    access_token = Text(null=False)
+    refresh_token = Text(null=False)
+    expires_at = Integer(null=False)

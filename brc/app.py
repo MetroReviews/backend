@@ -1,15 +1,18 @@
 import asyncio
+from base64 import b64encode
 import datetime
 import json
+import time
 import uuid
 import aiohttp
 import discord
 import secrets as _secrets
 from discord.ext import commands
-from fastapi.responses import HTMLResponse, ORJSONResponse
+from fastapi.responses import HTMLResponse, ORJSONResponse, RedirectResponse
 from fastapi.security.api_key import APIKeyHeader
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.routing import Mount
+import orjson
 from piccolo.engine import engine_finder
 from piccolo_admin.endpoints import create_admin
 
@@ -634,3 +637,106 @@ async def on_member_join(member: discord.Member):
         # This is a bot owned guild, transfer ownership and leave
         await member.guild.edit(owner=member)
         await member.guild.leave()
+
+
+# Panel code
+class FakeResponse():
+    def __init__(self, ws: WebSocket):
+        self.ws = ws
+
+    async def send_message(self, 
+        content, 
+        *, 
+        embed,
+        embeds):
+        await self.ws.send_json({"content": content, "embed": embed.to_dict(), "embeds": [e.to_dict() for e in embeds]})
+
+class FakeChannel():
+    def __init__(self, ws: WebSocket):
+        self.ws = ws
+        self.id = 0
+
+    async def send(self, 
+        content, 
+        *, 
+        embed,
+        embeds):
+        await self.ws.send_json({"content": content, "embed": embed.to_dict(), "embeds": [e.to_dict() for e in embeds]})
+
+class FakeInteraction():
+    def __init__(self, ws: WebSocket):
+        self.response = FakeResponse(ws)
+        self.channel = FakeChannel(ws)
+
+@app.get("/_panel/strikestone", tags=["Panel (Internal)"])
+def get_oauth2():
+    return ORJSONResponse({"url": f"https://discord.com/api/oauth2/authorize?client_id={bot.application_id}&permissions=0&scope=identify%20guilds%20guilds.members.read&response_type=code&redirect_uri=https://catnip.metrobots.xyz/_panel/frostpaw"})
+
+@app.get("/_panel/frostpaw")
+async def complete_oauth2(request: Request, code: str):
+    payload = {
+        'grant_type': 'authorization_code',
+        'code': code,
+        'client_id': bot.application_id,
+        'redirect_uri': "https://catnip.metrobots.xyz/_panel/frostpaw",
+        'client_secret': secrets["client_secret"],
+    }
+
+    async with aiohttp.ClientSession() as sess:
+        async with sess.post("https://discord.com/api/v10/oauth2/token", data=payload) as resp:
+            if resp.status != 200:
+                return await resp.json()
+            data = await resp.json()
+
+            scope = data["scope"].split(" ")
+
+            if "identify" not in scope or "guilds" not in scope or "guilds.members.read" not in scope:
+                return {"error": f"Invalid scopes, got {data['scope']} but have {scope}"}
+            
+            if data["token_type"] != "Bearer":
+                return {"error": f"Invalid token type, got {data['token_type']}"}
+            
+
+            # Fetch user info
+            async with sess.get(f"https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {data['access_token']}"}) as resp:
+                if resp.status != 200:
+                    return await resp.json()
+                user = await resp.json()
+
+            # Save the token
+            nonce = _secrets.token_urlsafe()
+
+            try:
+                await tables.Users.insert(
+                    tables.Users(
+                        user_id=int(user["id"]),
+                        access_token=data["access_token"],
+                        refresh_token=data["refresh_token"],
+                        expires_at=data["expires_in"] + time.time(),
+                        nonce=nonce
+                    )
+                )
+            except Exception:
+                pass
+
+            old_nonce = await tables.Users.select(tables.Users.nonce).where(tables.Users.user_id == int(user["id"])).first()
+
+            await tables.Users.update(
+                access_token=data["access_token"],
+                refresh_token=data["refresh_token"],
+                expires_at=data["expires_in"] + time.time(),
+            ).where(tables.Users.user_id == int(user["id"]))
+
+            ticket = {
+                "nonce": nonce,
+                "user_id": int(user["id"]),
+                "username": user["username"], # Ignored during actual auth
+                "disc": user["discriminator"],
+                "avatar": user["avatar"],
+            }
+
+            ticket = b64encode(orjson.dumps(ticket)).decode()
+
+            return RedirectResponse(
+                f"https://metrobots.xyz/curlfeather?ticket={ticket}"
+            )
