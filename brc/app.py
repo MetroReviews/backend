@@ -1,8 +1,7 @@
 import asyncio
-from base64 import b64encode
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 import datetime
 import json
-import time
 import uuid
 import aiohttp
 import discord
@@ -70,10 +69,6 @@ async def open_database_connection_pool():
 async def close_database_connection_pool():
     engine = engine_finder()
     await engine.close_connnection_pool()
-
-@app.get("/")
-async def brc_index():
-    return HTMLResponse(site_html)
 
 @app.get("/list/{id}")
 async def get_list(id: uuid.UUID):
@@ -349,7 +344,7 @@ All optional fields are actually *optional* and does not need to be posted
         invite = _bot.invite
 
     # TODO: Add bot add propogation in final scope plans if this is successful
-    embed = discord.Embed(url=f"https://metrobots.xyz?preview={bot_id}", title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
+    embed = discord.Embed(url=f"https://metrobots.xyz/bots/{bot_id}", title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
     c = bot.get_channel(secrets["queue_channel"])
     await c.send(f"<@&{secrets['test_ping_role'] or secrets['reviewer']}>", embed=embed)
     return {"removed": rem}
@@ -416,12 +411,13 @@ async def post_act(
     action: tables.Action,
     key: str,
     bot_id: int,
-    reason: str
+    reason: str,
+    resend: bool = False
 ):
     if len(reason) < 5:
         return await interaction.response.send_message("Reason too short (5 characters minimum)")
 
-    if not isinstance(interaction.user, discord.Member):
+    if not interaction.guild:
         return
     
     if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
@@ -432,51 +428,54 @@ async def post_act(
     if not bot_data:
         return await interaction.response.send_message(f"This bot (`{bot_id}`) cannot be found")        
 
-    if action == tables.Action.CLAIM and bot_data["state"] != tables.State.PENDING:
-        return await interaction.response.send_message("This bot cannot be claimed as it is not pending review? Maybe someone is testing it right noe?")
-    elif action == tables.Action.UNCLAIM and bot_data["state"] != tables.State.UNDER_REVIEW:
-        return await interaction.response.send_message("This bot cannot be unclaimed as it is not under review?")
-    elif action == tables.Action.APPROVE and bot_data["state"] != tables.State.UNDER_REVIEW:
-        return await interaction.response.send_message("This bot cannot be approved as it is not under review?")
-    elif action == tables.Action.DENY and bot_data["state"] != tables.State.UNDER_REVIEW:
-        return await interaction.response.send_message("This bot cannot be denied as it is not under review?")
+    if not resend:
+        if action == tables.Action.CLAIM and bot_data["state"] != tables.State.PENDING:
+            return await interaction.response.send_message("This bot cannot be claimed as it is not pending review? Maybe someone is testing it right noe?")
+        elif action == tables.Action.UNCLAIM and bot_data["state"] != tables.State.UNDER_REVIEW:
+            return await interaction.response.send_message("This bot cannot be unclaimed as it is not under review?")
+        elif action == tables.Action.APPROVE and bot_data["state"] != tables.State.UNDER_REVIEW:
+            return await interaction.response.send_message("This bot cannot be approved as it is not under review?")
+        elif action == tables.Action.DENY and bot_data["state"] != tables.State.UNDER_REVIEW:
+            return await interaction.response.send_message("This bot cannot be denied as it is not under review?")
 
     if action == tables.Action.CLAIM:
         cls = tables.State.UNDER_REVIEW
-        await tables.BotQueue.update(reviewer=interaction.user.id).where(tables.BotQueue.bot_id == bot_id)
-        
-        # Make new server using discord api
-        try:
-            created_guild = await bot.create_guild(name=f"{bot_id} testing")
-            channel = await created_guild.create_text_channel(name="do-not-delete-this-channel")
-            invite = await channel.create_invite(reason="Bot Reviewer invite")
-            await interaction.channel.send(f"**{interaction.user.mention}\nPlease join the following server to test the bot. If you do not do so within 1 minute (will increase, just for testing), this server will be deleted and the bot will be unclaimed!**\n\n{invite.url}")
 
-            await tables.BotQueue.update(invite_link=invite.url).where(tables.BotQueue.bot_id == bot_id)
+        if not resend:
+            await tables.BotQueue.update(reviewer=interaction.user.id).where(tables.BotQueue.bot_id == bot_id)
+            
+            # Make new server using discord api
+            try:
+                created_guild = await bot.create_guild(name=f"{bot_id} testing")
+                channel = await created_guild.create_text_channel(name="do-not-delete-this-channel")
+                invite = await channel.create_invite(reason="Bot Reviewer invite")
+                await interaction.channel.send(f"**{interaction.user.mention}\nPlease join the following server to test the bot. If you do not do so within 1 minute (will increase, just for testing), this server will be deleted and the bot will be unclaimed!**\n\n{invite.url}")
 
-            async def _task(guild: discord.Guild, bot_id: int):
-                await asyncio.sleep(60)
-                cached_guild = bot.get_guild(guild.id)
-                if not cached_guild:
-                    return # All good
-                if not cached_guild.owner_id:
-                    return await _task(guild, bot_id)
-                if cached_guild.owner_id == bot.user.id:
-                    # Then the user has not joined the server in time
-                    await tables.BotQueue.update(invite_link=None).where(tables.BotQueue.bot_id == bot_id)
-                    try:
-                        await guild.delete()
-                    except discord.errors.Forbidden:
-                        return
-                    except Exception as exc:
-                        print(f"Failed to delete guild: {exc}")
-                    await interaction.channel.send(content=f"**{interaction.user.mention}\nYou have not joined the server in time. The bot will be unclaimed and the server has been deleted!**")
-                    await tables.BotQueue.update(state=tables.State.PENDING, reviewer=None).where(tables.BotQueue.bot_id == bot_id)
-            asyncio.create_task(_task(created_guild, bot_id))
-            print("Got here")
+                await tables.BotQueue.update(invite_link=invite.url).where(tables.BotQueue.bot_id == bot_id)
 
-        except Exception as exc:
-            return await interaction.response.send_message(f"Failed to create new server for testing: {exc}")
+                async def _task(guild: discord.Guild, bot_id: int):
+                    await asyncio.sleep(60)
+                    cached_guild = bot.get_guild(guild.id)
+                    if not cached_guild:
+                        return # All good
+                    if not cached_guild.owner_id:
+                        return await _task(guild, bot_id)
+                    if cached_guild.owner_id == bot.user.id:
+                        # Then the user has not joined the server in time
+                        await tables.BotQueue.update(invite_link=None).where(tables.BotQueue.bot_id == bot_id)
+                        try:
+                            await guild.delete()
+                        except discord.errors.Forbidden:
+                            return
+                        except Exception as exc:
+                            print(f"Failed to delete guild: {exc}")
+                        await interaction.channel.send(content=f"**{interaction.user.mention}\nYou have not joined the server in time. The bot will be unclaimed and the server has been deleted!**")
+                        await tables.BotQueue.update(state=tables.State.PENDING, reviewer=None).where(tables.BotQueue.bot_id == bot_id)
+                asyncio.create_task(_task(created_guild, bot_id))
+                print("Got here")
+
+            except Exception as exc:
+                return await interaction.response.send_message(f"Failed to create new server for testing: {exc}")
 
     elif action == tables.Action.UNCLAIM:
         cls = tables.State.PENDING
@@ -484,7 +483,7 @@ async def post_act(
         cls = tables.State.APPROVED
     elif action == tables.Action.DENY:
         cls = tables.State.DENIED
-    
+
     await tables.BotQueue.update(state=cls).where(tables.BotQueue.bot_id == bot_id)
 
     msg = f"**{action.name.title()}!**\n"
@@ -523,11 +522,28 @@ async def post_act(
     
     embed = discord.Embed(title="Bot Info", description=f"**Bot ID**: {bot_id}\n\n**Reason:** {reason}", color=discord.Color.green())
 
-    await interaction.followup.send(msg, embeds=[embed])
+    class ResendView(discord.ui.View):
+        def __init__(self, *args, **kwargs):
+            super().__init__(timeout=120)
+        
+        @discord.ui.button(label="Resend")
+        async def resend(self, interaction: discord.Interaction, _: discord.ui.Button):
+            return await post_act(
+                interaction, 
+                list_info, 
+                action,
+                key,
+                bot_id,
+                reason,
+                resend = True
+            )
+
+    await interaction.followup.send(msg, embeds=[embed], view=ResendView())
 
 
 class Claim(discord.ui.Modal, title='Claim Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
+    resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -537,11 +553,17 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
         
         list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.claim_bot_api, tables.BotList.secret_key)
 
-        return await post_act(interaction, list_info, tables.Action.CLAIM, "claim_bot_api", bot_id, "STUB_REASON")
+        resend = self.resend.value.lower() in ("t", "true")
+
+        if resend and interaction.user.id not in secrets["owners"]:
+            return await interaction.response.send_message("You are not an owner")
+
+        return await post_act(interaction, list_info, tables.Action.CLAIM, "claim_bot_api", bot_id, "STUB_REASON", resend=resend)
 
 class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
     reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000, min_length=5)
+    resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -551,12 +573,19 @@ class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
 
         list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.unclaim_bot_api, tables.BotList.secret_key)
 
-        return await post_act(interaction, list_info, tables.Action.UNCLAIM, "unclaim_bot_api", bot_id, self.reason.value)
+        resend = self.resend.value.lower() in ("t", "true")
+
+        if resend and interaction.user.id not in secrets["owners"]:
+            return await interaction.response.send_message("You are not an owner")
+
+        return await post_act(interaction, list_info, tables.Action.UNCLAIM, "unclaim_bot_api", bot_id, self.reason.value, resend=resend)
 
 
 class Approve(discord.ui.Modal, title='Approve Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
     reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000, min_length=5)
+    resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
+
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -566,11 +595,17 @@ class Approve(discord.ui.Modal, title='Approve Bot'):
 
         list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.approve_bot_api, tables.BotList.secret_key)
 
-        return await post_act(interaction, list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, self.reason.value)
+        resend = self.resend.value.lower() in ("t", "true")
+
+        if resend and interaction.user.id not in secrets["owners"]:
+            return await interaction.response.send_message("You are not an owner")
+
+        return await post_act(interaction, list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, self.reason.value, resend=resend)
 
 class Deny(discord.ui.Modal, title='Deny Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
     reason = discord.ui.TextInput(label='Reason', style=discord.TextStyle.paragraph, max_length=4000, min_length=5)
+    resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -580,7 +615,12 @@ class Deny(discord.ui.Modal, title='Deny Bot'):
 
         list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.deny_bot_api, tables.BotList.secret_key)
 
-        return await post_act(interaction, list_info, tables.Action.DENY, "deny_bot_api", bot_id, self.reason.value)
+        resend = self.resend.value.lower() in ("t", "true")
+
+        if resend and interaction.user.id not in secrets["owners"]:
+            return await interaction.response.send_message("You are not an owner")
+
+        return await post_act(interaction, list_info, tables.Action.DENY, "deny_bot_api", bot_id, self.reason.value, resend=resend)
 
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
@@ -647,9 +687,16 @@ class FakeResponse():
     async def send_message(self, 
         content, 
         *, 
-        embed,
-        embeds):
-        await self.ws.send_json({"content": content, "embed": embed.to_dict(), "embeds": [e.to_dict() for e in embeds]})
+        embed = None,
+        embeds = []
+    ):
+        if embed:
+            embeds.append(embed)
+        await self.ws.send_json({"content": content, "embeds": [e.to_dict() for e in embeds]})
+
+    async def defer(self, *args, **kwargs):
+        await self.ws.send_json({"defer": True})
+
 
 class FakeChannel():
     def __init__(self, ws: WebSocket):
@@ -659,20 +706,126 @@ class FakeChannel():
     async def send(self, 
         content, 
         *, 
-        embed,
-        embeds):
-        await self.ws.send_json({"content": content, "embed": embed.to_dict(), "embeds": [e.to_dict() for e in embeds]})
+        embed = None,
+        embeds = []
+    ):
+        if embed:
+            embeds.append(embed)
+        await self.ws.send_json({"content": content, "embeds": [e.to_dict() for e in embeds]})
+
+class FakeUser():
+    def __init__(self, ws: WebSocket, id: int):
+        self.ws = ws
+        self.id = id
+        self.roles = [FSnowflake(id=secrets["reviewer"])]
+        self.mention = f"<@{id}>"
 
 class FakeInteraction():
     def __init__(self, ws: WebSocket):
         self.response = FakeResponse(ws)
+        self.followup = FakeChannel(ws)
         self.channel = FakeChannel(ws)
+        self.user = FakeUser(ws, ws.state.user["user_id"])
+        self.guild_id = secrets["gid"]
+        self.guild = FSnowflake(id=secrets["gid"])
 
 @app.get("/_panel/strikestone", tags=["Panel (Internal)"])
 def get_oauth2():
-    return ORJSONResponse({"url": f"https://discord.com/api/oauth2/authorize?client_id={bot.application_id}&permissions=0&scope=identify%20guilds%20guilds.members.read&response_type=code&redirect_uri=https://catnip.metrobots.xyz/_panel/frostpaw"})
+    return ORJSONResponse({"url": f"https://discord.com/api/oauth2/authorize?client_id={bot.application_id}&permissions=0&scope=identify%20guilds&response_type=code&redirect_uri=https://catnip.metrobots.xyz/_panel/frostpaw"})
 
-@app.get("/_panel/frostpaw")
+class StarClan():
+    def __init__(self):
+        self.ws_list = []
+    
+    def add(self, ws: WebSocket):
+        self.ws_list.append(ws)
+
+    def remove(self, ws: WebSocket):
+        self.ws_list.remove(ws)
+
+sc = StarClan()
+
+class SPL:
+    unsuppprted = "U"
+    auth_fail = "AF"
+    out_of_date = "OD"
+    done = "D"
+
+@app.websocket("/_panel/starclan")
+async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
+    if ws.headers.get("Origin") != "https://metrobots.xyz":
+        await ws.accept()
+        await ws.send_json({"resp": "spld", "e": SPL.unsuppprted})
+        await ws.close(code=4009)
+        return
+
+    await ws.accept()
+
+    if nonce != "ashfur-v1":
+        await ws.send_json({"resp": "spld", "e": SPL.out_of_date})
+        return
+
+    try:
+        ws.state.ticket = orjson.loads(urlsafe_b64decode(ticket))
+        if "nonce" not in ws.state.ticket.keys() or "user_id" not in ws.state.ticket.keys():
+            await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Invalid ticket"})
+            await ws.close(code=4009)
+            return
+        
+        ws.state.ticket["user_id"] = int(ws.state.ticket["user_id"])
+
+        user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
+        if not user:
+            await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
+            await ws.close(code=4009)
+            return
+        
+        ws.state.user = user
+
+    except Exception as exc:
+        await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": str(exc)})
+        await ws.close(code=4009)
+        return
+
+    sc.add(ws)
+    try:
+        while True:
+            data = await ws.receive_json()
+            if data["act"] == "claim":
+                list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.claim_bot_api, tables.BotList.secret_key)
+                await post_act(FakeInteraction(ws), list_info, tables.Action.CLAIM, "claim_bot_api", int(data["id"]), "STUB_REASON")
+    except WebSocketDisconnect:
+        sc.remove(ws)
+        await ws.close(code=4008)
+    except Exception as exc:
+        print(exc)
+        sc.remove(ws)
+        await ws.close(code=4009)
+
+@app.get("/_panel/mapleshade", tags=["Panel (Internal)"])
+async def get_panel_access(ticket: str):
+    try:
+        ticket = orjson.loads(urlsafe_b64decode(ticket))
+    except:
+        return {"access": False}
+    if "nonce" not in ticket.keys() or "user_id" not in ticket.keys():
+        return {"access": False}
+    ticket["user_id"] = int(ticket["user_id"])
+    user = await tables.Users.select().where(tables.Users.user_id==ticket["user_id"], tables.Users.nonce==ticket["nonce"]).first()
+    if not user:
+        return {"access": False}
+    guild = bot.get_guild(secrets["gid"])
+    if not guild:
+        return {"access": False}
+    member = guild.get_member(user["user_id"])
+    if not member:
+        return {"access": False}
+    if discord.utils.get(member.roles, id=secrets["reviewer"]):
+        return {"access": True}
+    return {"access": False}
+
+
+@app.get("/_panel/frostpaw", tags=["Panel (Internal)"])
 async def complete_oauth2(request: Request, code: str):
     payload = {
         'grant_type': 'authorization_code',
@@ -690,7 +843,7 @@ async def complete_oauth2(request: Request, code: str):
 
             scope = data["scope"].split(" ")
 
-            if "identify" not in scope or "guilds" not in scope or "guilds.members.read" not in scope:
+            if "identify" not in scope or "guilds" not in scope:
                 return {"error": f"Invalid scopes, got {data['scope']} but have {scope}"}
             
             if data["token_type"] != "Bearer":
@@ -710,9 +863,6 @@ async def complete_oauth2(request: Request, code: str):
                 await tables.Users.insert(
                     tables.Users(
                         user_id=int(user["id"]),
-                        access_token=data["access_token"],
-                        refresh_token=data["refresh_token"],
-                        expires_at=data["expires_in"] + time.time(),
                         nonce=nonce
                     )
                 )
@@ -721,21 +871,15 @@ async def complete_oauth2(request: Request, code: str):
 
             old_nonce = await tables.Users.select(tables.Users.nonce).where(tables.Users.user_id == int(user["id"])).first()
 
-            await tables.Users.update(
-                access_token=data["access_token"],
-                refresh_token=data["refresh_token"],
-                expires_at=data["expires_in"] + time.time(),
-            ).where(tables.Users.user_id == int(user["id"]))
-
             ticket = {
-                "nonce": nonce,
-                "user_id": int(user["id"]),
+                "nonce": old_nonce["nonce"],
+                "user_id": str(user["id"]),
                 "username": user["username"], # Ignored during actual auth
                 "disc": user["discriminator"],
                 "avatar": user["avatar"],
             }
 
-            ticket = b64encode(orjson.dumps(ticket)).decode()
+            ticket = urlsafe_b64encode(orjson.dumps(ticket)).decode()
 
             return RedirectResponse(
                 f"https://metrobots.xyz/curlfeather?ticket={ticket}"
