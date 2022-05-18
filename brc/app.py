@@ -178,6 +178,9 @@ async def our_team():
     team = []
 
     for member in guild.members:
+        if member.id in [564164277251080208]:
+            continue
+
         list_roles = []
         is_list_owner = False
         sudo = False
@@ -688,7 +691,8 @@ class FakeResponse():
         content, 
         *, 
         embed = None,
-        embeds = []
+        embeds = [],
+        **_,
     ):
         if embed:
             embeds.append(embed)
@@ -696,6 +700,17 @@ class FakeResponse():
 
     async def defer(self, *args, **kwargs):
         await self.ws.send_json({"defer": True})
+
+class FakeState:
+    ...
+
+class FakeWs():
+    def __init__(self):
+        self.resp = []
+        self.state = FakeState()
+    
+    async def send_json(self, data):
+        self.resp.append(data)
 
 
 class FakeChannel():
@@ -707,7 +722,8 @@ class FakeChannel():
         content, 
         *, 
         embed = None,
-        embeds = []
+        embeds = [],
+        **_,
     ):
         if embed:
             embeds.append(embed)
@@ -728,6 +744,25 @@ class FakeInteraction():
         self.user = FakeUser(ws, ws.state.user["user_id"])
         self.guild_id = secrets["gid"]
         self.guild = FSnowflake(id=secrets["gid"])
+
+@app.get("/littlecloud/{bot_id}")
+async def reapprove_bot(bot_id: int):
+    list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.approve_bot_api, tables.BotList.secret_key)
+    
+    bot = await tables.BotQueue.select(tables.BotQueue.state).where(tables.BotQueue.bot_id == bot_id).first()
+
+    if not bot or bot["state"] != tables.State.APPROVED:
+        return HTMLResponse("Bot is not approved and cannot be reapproved!")
+
+    ws = FakeWs()
+
+    ws.state.user = {
+        "user_id": 510065483693817867 # Reapprove as toxic dev
+    }
+
+    await post_act(FakeInteraction(ws), list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, "Already approved, readding due to errors (Automated Action)", resend=True)
+
+    return ws.resp
 
 @app.get("/_panel/strikestone", tags=["Panel (Internal)"])
 def get_oauth2():
