@@ -422,8 +422,17 @@ async def post_act(
 
     if not interaction.guild:
         return
-    
-    if not discord.utils.get(interaction.user.roles, id=secrets["reviewer"]) or interaction.guild_id != secrets["gid"]:
+   
+    if interaction.guild.id != secrets["gid"]:
+        guild = bot.get_guild(secrets["gid"])
+        try:
+            roles = guild.get_member(interaction.user.id).roles
+        except Exception as exc:
+            return await interaction.response.send_message(f"You must have the `Reviewer` role to use this command. {exc}")
+    else:
+        roles = interaction.user.roles
+
+    if not discord.utils.get(roles, id=secrets["reviewer"]):
         return await interaction.response.send_message("You must have the `Reviewer` role to use this command.")
     
     bot_data = await tables.BotQueue.select().where(tables.BotQueue.bot_id == bot_id).first()
@@ -520,7 +529,7 @@ async def post_act(
     
     # Post intent to actions
     await tables.BotAction.insert(
-        tables.BotAction(bot_id=bot_id, action=action, action_time=datetime.datetime.now(), list_source=bot_data["list_source"])
+        tables.BotAction(bot_id=bot_id, reason=reason, reviewer=str(interaction.user.id), action=action, action_time=datetime.datetime.now(), list_source=bot_data["list_source"])
     )
     
     embed = discord.Embed(title="Bot Info", description=f"**Bot ID**: {bot_id}\n\n**Reason:** {reason}", color=discord.Color.green())
@@ -785,6 +794,25 @@ class SPL:
     auth_fail = "AF"
     out_of_date = "OD"
     done = "D"
+
+@app.post("/bots/{bot_id}/approve")
+async def approve_bot(bot_id: int, reviewer: int, list_id: uuid.UUID, auth: str = Depends(auth_header)):
+    if (auth := await _auth(list_id, auth)):
+        return auth 
+
+    list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.approve_bot_api, tables.BotList.secret_key)
+    
+    ws = FakeWs()
+
+    ws.state.user = {
+        "user_id": reviewer # Reapprove as toxic dev
+    }
+
+    await tables.BotQueue.update(state = tables.State.UNDER_REVIEW).where(tables.BotQueue.bot_id == bot_id)
+
+    await post_act(FakeInteraction(ws), list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, "Already approved, readding due to errors (Automated Action)")
+
+    return ws.resp
 
 @app.websocket("/_panel/starclan")
 async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
