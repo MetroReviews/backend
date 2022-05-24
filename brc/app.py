@@ -501,15 +501,35 @@ async def post_act(
     msg = f"**{action.name.title()}!**\n"
 
     await interaction.response.defer()
+
     for list in list_info:
         if list["state"] not in good_states:
             continue
+        if list["id"] != bot_data["list_source"] and not bot_data["cross_add"]:
+            # Send limited 
+            data = {
+                "bot_id": bot_data["bot_id"], 
+                "owner": bot_data["owner"], 
+                "extra_owners": bot_data["extra_owners"],
+                "cross_add": False,
+                "prefix": None, # Dont send prefix
+                "description": "", # Dont send description
+                "long_description": "", # Dont send ld
+                "list_source": bot_data["list_source"],
+                "nsfw": True, # Dont send nsfw
+                "tags": ["this-shouldnt-be-set"], # Dont send tags
+                "username": bot_data["username"], # Username is needed for approve 
+                "added_at": bot_data["added_at"], 
+            }
+        else:
+            data = bot_data
+
         try:
             async with aiohttp.ClientSession() as sess:
                 async with sess.post(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
-                    json=bot_data | {
+                    json=data | {
                         "reason": reason or "STUB_REASON", 
                         "reviewer": str(interaction.user.id), 
                         "added_at": str(bot_data["added_at"]), 
@@ -795,8 +815,11 @@ class SPL:
     out_of_date = "OD"
     done = "D"
 
+class Reason(pydantic.BaseModel):
+    reason: str
+
 @app.post("/bots/{bot_id}/approve")
-async def approve_bot(bot_id: int, reviewer: int, list_id: uuid.UUID, auth: str = Depends(auth_header)):
+async def approve_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.UUID, auth: str = Depends(auth_header)):
     if (auth := await _auth(list_id, auth)):
         return auth 
 
@@ -805,12 +828,12 @@ async def approve_bot(bot_id: int, reviewer: int, list_id: uuid.UUID, auth: str 
     ws = FakeWs()
 
     ws.state.user = {
-        "user_id": reviewer # Reapprove as toxic dev
+        "user_id": reviewer
     }
 
     await tables.BotQueue.update(state = tables.State.UNDER_REVIEW).where(tables.BotQueue.bot_id == bot_id)
 
-    await post_act(FakeInteraction(ws), list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, "Already approved, readding due to errors (Automated Action)")
+    await post_act(FakeInteraction(ws), list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, reason.reason)
 
     return ws.resp
 
