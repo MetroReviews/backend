@@ -376,17 +376,25 @@ class FSnowflake():
         self.id: int = id
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
-async def queue(interaction: discord.Interaction):
+async def invite(interaction: discord.Interaction, bot_id: str):
+    if not bot_id.isdigit():
+        return await interaction.response.send_message("Invalid bot id")
+    return await interaction.response.send_message(f"https://discord.com/oauth2/authorize?client_id={bot_id}&scope=bot%20applications.commands&permissions=0")
+
+@bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
+async def queue(interaction: discord.Interaction, show_all: bool = False):
     """Bot queue"""
     states = {}
     for state in list(tables.State):
+        if not show_all and state not in (tables.State.PENDING, tables.State.UNDER_REVIEW):
+            continue
         states[state] = await tables.BotQueue.select(tables.BotQueue.bot_id, tables.BotQueue.username).where(tables.BotQueue.state == state)
     msg = []
     msg_index = -1
     for key, bots in states.items():
         if not len(bots):
             continue
-        msg.append(f"**{key.name} ({key.value})**\n\n")
+        msg.append(f"**{key.name} ({len(bots)})**\n\n")
         msg_index += 1
         for bot in bots:
             if len(msg) > 1900:
