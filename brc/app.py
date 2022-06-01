@@ -794,7 +794,7 @@ async def reapprove_bot(bot_id: int):
     ws = FakeWs()
 
     ws.state.user = {
-        "user_id": 510065483693817867 # Reapprove as toxic dev
+        "user_id": 815553000470478850 # Reapprove as toxic dev
     }
 
     await post_act(FakeInteraction(ws), list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, "Already approved, readding due to errors (Automated Action)", resend=True)
