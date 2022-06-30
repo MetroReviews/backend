@@ -178,7 +178,7 @@ async def our_team():
     team = []
 
     for member in guild.members:
-        if member.id in [564164277251080208]:
+        if member.id in []:
             continue
 
         list_roles = []
