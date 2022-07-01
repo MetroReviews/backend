@@ -1,0 +1,10 @@
+[
+	{
+		"name": "brc",
+		"script": "unbuffer python3.10 -m uvicorn brc.app:app",
+		"cwd": "../backend",
+		"env": {
+			"PYTHONUNBUFFERED": 1
+		}
+	}
+]

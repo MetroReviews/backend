@@ -516,8 +516,8 @@ async def post_act(
         if list["id"] != bot_data["list_source"] and not bot_data["cross_add"]:
             # Send limited 
             data = {
-                "bot_id": bot_data["bot_id"], 
-                "owner": bot_data["owner"], 
+                "bot_id": str(bot_data["bot_id"]), 
+                "owner": str(bot_data["owner"]), 
                 "extra_owners": bot_data["extra_owners"],
                 "cross_add": False,
                 "prefix": None, # Dont send prefix
@@ -538,6 +538,8 @@ async def post_act(
                     list[key], 
                     headers={"Authorization": list["secret_key"], "User-Agent": "Frostpaw/0.1"}, 
                     json=data | {
+                        "bot_id": str(bot_data["bot_id"]), 
+                        "owner": str(bot_data["owner"]), 
                         "reason": reason or "STUB_REASON", 
                         "reviewer": str(interaction.user.id), 
                         "added_at": str(bot_data["added_at"]), 
@@ -548,7 +550,9 @@ async def post_act(
                 ) as resp:
                     msg += f"{list['name']} -> {resp.status}"
                     try:
-                        json_d = await resp.json()
+                        json_d = await resp.text()
+                        if resp.headers.get("content-type", "").startswith("application/json"):
+                            json_d = orjson.loads(json_d)
                     except Exception as exc:
                         json_d = f"JSON deser failed {exc}"
                     msg += f" ({json_d})\n"
@@ -844,6 +848,26 @@ async def approve_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.
     await post_act(FakeInteraction(ws), list_info, tables.Action.APPROVE, "approve_bot_api", bot_id, reason.reason)
 
     return ws.resp
+
+@app.post("/bots/{bot_id}/deny")
+async def deny_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.UUID, auth: str = Depends(auth_header)):
+    if (auth := await _auth(list_id, auth)):
+        return auth
+
+    list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.deny_bot_api, tables.BotList.secret_key)
+
+    ws = FakeWs()
+
+    ws.state.user = {
+        "user_id": reviewer
+    }
+
+    await tables.BotQueue.update(state = tables.State.UNDER_REVIEW).where(tables.BotQueue.bot_id == bot_id)
+
+    await post_act(FakeInteraction(ws), list_info, tables.Action.DENY, "deny_bot_api", bot_id, reason.reason)
+
+    return ws.resp
+
 
 @app.websocket("/_panel/starclan")
 async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
