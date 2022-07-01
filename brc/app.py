@@ -178,7 +178,7 @@ async def our_team():
     team = []
 
     for member in guild.members:
-        if member.id in [564164277251080208]:
+        if member.id in []:
             continue
 
         list_roles = []
@@ -414,7 +414,7 @@ async def sync(interaction: discord.Interaction):
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
 async def support(interaction: discord.Interaction):
     """Show the link to support"""
-    await interaction.response.send_message("https://github.com/BotReviewerConsortium/support")
+    await interaction.response.send_message("https://github.com/MetroReviews/support")
 
 async def post_act(
     interaction: discord.Interaction, 
@@ -469,7 +469,7 @@ async def post_act(
                 created_guild = await bot.create_guild(name=f"{bot_id} testing")
                 channel = await created_guild.create_text_channel(name="do-not-delete-this-channel")
                 invite = await channel.create_invite(reason="Bot Reviewer invite")
-                await interaction.channel.send(f"**{interaction.user.mention}\nPlease join the following server to test the bot. If you do not do so within 1 minute (will increase, just for testing), this server will be deleted and the bot will be unclaimed!**\n\n{invite.url}")
+                await interaction.channel.send(f"**{interaction.user.mention}\nPlease join the following server to test the bot. If you do not do so within 1 minute (will increase, just for testing), this server will be deleted and the bot will be unclaimed!**\n\n{invite.url}\n\nYou can add the bot to the server using this link: https://discord.com/oauth2/authorize?client_id={bot_id}&permissions=0&guild_id={created_guild.id}&scope=bot%20applications.commands&disable_guild_select=true")
 
                 await tables.BotQueue.update(invite_link=invite.url).where(tables.BotQueue.bot_id == bot_id)
 
