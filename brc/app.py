@@ -274,7 +274,17 @@ All optional fields are actually *optional* and does not need to be posted
             rem.append("extra_owners")
     except:
         return ORJSONResponse({"error": "Invalid bot fields"}, status_code=400)
-    
+   
+    if owner in extra_owners:
+        flag = True
+        while flag:
+            try:
+                extra_owners.remove(owner)
+            except:
+                flag = False
+
+    extra_owners = list(set(extra_owners))
+
     if _bot.banner:
         if not _bot.banner.startswith("https://"):
             _bot.banner = bot.banner.replace("http://", "https://")
