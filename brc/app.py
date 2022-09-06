@@ -867,6 +867,8 @@ class StarClan():
 sc = StarClan()
 
 class SPL:
+    ping = "P"
+    maint = "M"
     unsuppprted = "U"
     auth_fail = "AF"
     out_of_date = "OD"
@@ -913,16 +915,35 @@ async def deny_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.UUI
 
     return ws.resp
 
+async def notifs(ws: WebSocket):
+    print("Notifs started")
+    notifs_sent = []
+    notifs_sent_times = 0
+
+    while True:
+        try:
+            res = await ws.send_json({"resp": "spld", "e": SPL.ping})
+            notifs_sent_times += 1
+        except Exception as exc:
+            print(exc)
+            try:
+                res = await ws.send_json({"resp": "spld", "e": SPL.maint, "hint": "Client disconnected"})
+                await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Nonce expiry"})
+                await ws.close(code=4009)
+            except:
+                continue
+            return
+        await asyncio.sleep(5)
+
 
 @app.websocket("/_panel/starclan")
 async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
+    print("got here")
+    await ws.accept()
     if ws.headers.get("Origin") not in origins:
-        await ws.accept()
         await ws.send_json({"resp": "spld", "e": SPL.unsuppprted})
         await ws.close(code=4009)
         return
-
-    await ws.accept()
 
     if nonce != "ashfur-v1":
         await ws.send_json({"resp": "spld", "e": SPL.out_of_date})
@@ -942,6 +963,8 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
         
         ws.state.ticket["user_id"] = int(ws.state.ticket["user_id"])
 
+        ws.state.notif_task = asyncio.create_task(notifs(ws))
+
         user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
         if not user:
             await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
@@ -959,14 +982,35 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
     try:
         while True:
             data = await ws.receive_json()
+
+            # Ensure nonce has not changed
+            user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
+            if not user:
+                await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
+                await ws.close(code=4009)
+                return
+            
+            if "act" not in data.keys():
+                print("Hmmmm")
+                continue
+
             if data["act"] == "claim":
                 list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.claim_bot_api, tables.BotList.secret_key)
                 await post_act(FakeInteraction(ws), list_info, tables.Action.CLAIM, "claim_bot_api", int(data["id"]), "STUB_REASON")
     except WebSocketDisconnect:
+        try:
+            ws.state.notif_task.cancel()
+        except Exception as exc:
+            pass
         sc.remove(ws)
         await ws.close(code=4008)
     except Exception as exc:
         print(exc)
+        try:
+            ws.state.notif_task.cancel()
+        except Exception as exc:
+            pass
+
         sc.remove(ws)
         await ws.close(code=4009)
 
