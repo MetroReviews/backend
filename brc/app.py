@@ -49,7 +49,14 @@ app = FastAPI(
 with open("site.html") as site:
     site_html = site.read()
 
-bot = commands.Bot(intents=discord.Intents.all(), command_prefix="%")
+class MetroBot(commands.Bot):
+    async def is_owner(self, user: discord.User):
+        if user.id in secrets["owners"]:
+            return True
+
+        return False
+
+bot = MetroBot(intents=discord.Intents.all(), command_prefix="%")
 
 with open("secrets.json") as f:
     secrets = json.load(f)
@@ -756,6 +763,7 @@ class FakeState:
     ...
 
 class FakeWs():
+    """TODO: Remove FakeWs, its stupid asf"""
     def __init__(self):
         self.resp = []
         self.state = FakeState()
@@ -1010,5 +1018,5 @@ async def complete_oauth2(request: Request, code: str):
             ticket = urlsafe_b64encode(orjson.dumps(ticket)).decode()
 
             return RedirectResponse(
-                f"https://metrobots.xyz/curlfeather?ticket={ticket}"
+                f"https://burdockroot.metrobots.xyz/login?ticket={ticket}"
             )
