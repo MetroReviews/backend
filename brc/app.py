@@ -14,7 +14,8 @@ from fastapi.routing import Mount
 import orjson
 from piccolo.engine import engine_finder
 from piccolo_admin.endpoints import create_admin
-
+from fastapi.middleware.cors import CORSMiddleware
+import time
 import piccolo
 import pydantic
 
@@ -46,6 +47,20 @@ app = FastAPI(
     ],
 )
 
+origins = [
+    "http://metrobots.xyz",
+    "http://www.metrobots.xyz",
+    "https://burdockroot.metrobots.xyz"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 with open("site.html") as site:
     site_html = site.read()
 
@@ -57,6 +72,18 @@ class MetroBot(commands.Bot):
         return False
 
 bot = MetroBot(intents=discord.Intents.all(), command_prefix="%")
+
+def check_nonce_time(nonce):
+    split = nonce.split("@")
+    if len(split) != 2:
+        return False
+    try:
+        t = float(split[1])
+    except Exception as exc:
+        return False
+    if time.time() - t > 60 * 30:
+        return False
+    return True
 
 with open("secrets.json") as f:
     secrets = json.load(f)
@@ -889,7 +916,7 @@ async def deny_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.UUI
 
 @app.websocket("/_panel/starclan")
 async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
-    if ws.headers.get("Origin") != "https://metrobots.xyz":
+    if ws.headers.get("Origin") not in origins:
         await ws.accept()
         await ws.send_json({"resp": "spld", "e": SPL.unsuppprted})
         await ws.close(code=4009)
@@ -905,6 +932,11 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
         ws.state.ticket = orjson.loads(urlsafe_b64decode(ticket))
         if "nonce" not in ws.state.ticket.keys() or "user_id" not in ws.state.ticket.keys():
             await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Invalid ticket"})
+            await ws.close(code=4009)
+            return
+
+        if not check_nonce_time(ws.state.ticket["nonce"]):
+            await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Nonce expiry"})
             await ws.close(code=4009)
             return
         
@@ -946,6 +978,8 @@ async def get_panel_access(ticket: str):
         return {"access": False}
     if "nonce" not in ticket.keys() or "user_id" not in ticket.keys():
         return {"access": False}
+    if not check_nonce_time(ticket["nonce"]):
+        return {"access": False, "hint": "Nonce expiry"}
     ticket["user_id"] = int(ticket["user_id"])
     user = await tables.Users.select().where(tables.Users.user_id==ticket["user_id"], tables.Users.nonce==ticket["nonce"]).first()
     if not user:
@@ -956,8 +990,14 @@ async def get_panel_access(ticket: str):
     member = guild.get_member(user["user_id"])
     if not member:
         return {"access": False}
-    if discord.utils.get(member.roles, id=secrets["reviewer"]):
-        return {"access": True}
+    if discord.utils.get(member.roles, id=secrets["reviewer"]) or member.id in secrets["owners"]:
+        return {
+            "access": True, 
+            "member": {
+                "id": str(member.id),
+                "name": str(member.name)
+            }
+        }
     return {"access": False}
 
 
@@ -993,7 +1033,7 @@ async def complete_oauth2(request: Request, code: str):
                 user = await resp.json()
 
             # Save the token
-            nonce = _secrets.token_urlsafe()
+            nonce = _secrets.token_urlsafe() + "@" + str(time.time())
 
             try:
                 await tables.Users.insert(
@@ -1003,12 +1043,10 @@ async def complete_oauth2(request: Request, code: str):
                     )
                 )
             except Exception:
-                pass
-
-            old_nonce = await tables.Users.select(tables.Users.nonce).where(tables.Users.user_id == int(user["id"])).first()
+                await tables.Users.update(nonce=nonce).where(tables.Users.user_id == int(user["id"]))
 
             ticket = {
-                "nonce": old_nonce["nonce"],
+                "nonce": nonce,
                 "user_id": str(user["id"]),
                 "username": user["username"], # Ignored during actual auth
                 "disc": user["discriminator"],
