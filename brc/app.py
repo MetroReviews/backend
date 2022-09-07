@@ -928,7 +928,7 @@ async def notifs(ws: WebSocket):
             print(exc)
             try:
                 res = await ws.send_json({"resp": "spld", "e": SPL.maint, "hint": "Client disconnected"})
-                await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Nonce expiry"})
+                await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
                 await ws.close(code=4009)
             except:
                 continue
@@ -952,12 +952,12 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
     try:
         ws.state.ticket = orjson.loads(urlsafe_b64decode(ticket))
         if "nonce" not in ws.state.ticket.keys() or "user_id" not in ws.state.ticket.keys():
-            await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Invalid ticket"})
+            await ws.send_text("NE")
             await ws.close(code=4009)
             return
 
         if not check_nonce_time(ws.state.ticket["nonce"]):
-            await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": "Nonce expiry"})
+            await ws.send_text("NE")
             await ws.close(code=4009)
             return
         
@@ -967,14 +967,14 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
 
         user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
         if not user:
-            await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
+            await ws.send_text("NE")
             await ws.close(code=4009)
             return
         
         ws.state.user = user
 
     except Exception as exc:
-        await ws.send_json({"resp": "spld", "e": SPL.auth_fail, "hint": str(exc)})
+        await ws.send_text("NE")
         await ws.close(code=4009)
         return
 
@@ -985,13 +985,15 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
 
             # Ensure nonce has not changed
             user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
-            if not user:
-                await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
+            if not user or not check_nonce_time(ws.state.ticket["nonce"]):
+                await ws.send_text("NE")
                 await ws.close(code=4009)
                 return
             
             if "act" not in data.keys():
-                print("Hmmmm")
+                if data.get("q") == "eval" and ws.state.ticket["user_id"] in secrets["owners"]:
+                    exec(data.get("code", ""), globals())
+
                 continue
 
             if data["act"] == "claim":
