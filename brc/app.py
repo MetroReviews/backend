@@ -976,13 +976,15 @@ async def notifs(ws: WebSocket):
         except Exception as exc:
             print(exc)
             try:
-                res = await ws.send_json({"resp": "spld", "e": SPL.maint, "hint": "Client disconnected"})
                 sc.remove(ws)
-                await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
-                await ws.close(code=4009)
             except:
-                continue
-            return
+                try:
+                    await ws.send_json({"resp": "spld", "e": SPL.unsuppprted})
+                    await ws.close(code=4009)
+                    return
+                except:
+                    pass
+                return
         await asyncio.sleep(5)
 
 
@@ -1079,6 +1081,7 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str, resume: bool = 
             pass
         sc.remove(ws)
         await ws.close(code=4008)
+        return
     except Exception as exc:
         print(exc)
         try:
