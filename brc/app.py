@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, ORJSONResponse, RedirectResponse
 from fastapi.security.api_key import APIKeyHeader
 from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.routing import Mount
+from fastapi.encoders import jsonable_encoder
 import orjson
 from piccolo.engine import engine_finder
 from piccolo_admin.endpoints import create_admin
@@ -384,6 +385,11 @@ All optional fields are actually *optional* and does not need to be posted
             state=tables.State.PENDING
         )
     )
+
+    try:
+        await dispatch_event("bot", await tables.BotQueue.select(tables.BotQueue.bot_id).where(tables.BotQueue.bot_id == bot_id))
+    except:
+        print("failed to dispatch_event")
 
     if not _bot.invite:
         invite = f"https://discordapp.com/oauth2/authorize?client_id={bot_id}&scope=bot%20applications.commands&permissions=0"
@@ -903,7 +909,7 @@ async def deny_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.UUI
 
     list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.deny_bot_api, tables.BotList.secret_key)
 
-    ws = FakeWs()
+
 
     ws.state.user = {
         "user_id": reviewer
@@ -915,10 +921,53 @@ async def deny_bot(bot_id: int, reviewer: int, reason: Reason, list_id: uuid.UUI
 
     return ws.resp
 
+def parse_dict(d: dict | object):
+    """Parse dict for sending over WS to a JS client"""
+    if isinstance(d, int):
+        if d > 9007199254740991:
+            return str(d)
+        return d
+    elif isinstance(d, list):
+        return [parse_dict(i) for i in d]
+    elif isinstance(d, dict):
+        nd = {} # New dict
+        for k, v in d.items():
+            nd[k] = parse_dict(v)
+        return nd
+    else:
+        return d        
+
+
+
+async def dispatch_event(name, data):
+    for ws in sc.ws_list:
+        try:
+            await ws.send_json(parse_dict(jsonable_encoder({"resp": "dispatch", "n": name, "batch": [data] if type(data) != list else data})))
+        except:
+            print(f"error dispatching event {data}")
+
+async def ready(ws: WebSocket):
+    # Get list of bots
+    if not ws.state.resume:
+        bot_count = await tables.BotQueue.count()
+        await ws.send_json({"resp": "large_dispatch", "n": "bot", "count": bot_count})
+        
+        try:
+            async with await tables.BotQueue.select().batch(batch_size=10) as batch:
+                async for _batch in batch:
+                    try:
+                        await ws.send_json(parse_dict(jsonable_encoder({"resp": "dispatch", "n": "bot", "batch": _batch})))
+                    except:
+                        print("error")
+        except Exception as exc:
+            print(exc)
+
 async def notifs(ws: WebSocket):
     print("Notifs started")
     notifs_sent = []
     notifs_sent_times = 0
+
+    asyncio.create_task(ready(ws))
 
     while True:
         try:
@@ -928,6 +977,7 @@ async def notifs(ws: WebSocket):
             print(exc)
             try:
                 res = await ws.send_json({"resp": "spld", "e": SPL.maint, "hint": "Client disconnected"})
+                sc.remove(ws)
                 await ws.send_json({"resp": "spld", "e": SPL.auth_fail})
                 await ws.close(code=4009)
             except:
@@ -937,7 +987,7 @@ async def notifs(ws: WebSocket):
 
 
 @app.websocket("/_panel/starclan")
-async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
+async def starclan_panel(ws: WebSocket, ticket: str, nonce: str, resume: bool = False):
     print("got here")
     await ws.accept()
     if ws.headers.get("Origin") not in origins:
@@ -963,6 +1013,8 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
         
         ws.state.ticket["user_id"] = int(ws.state.ticket["user_id"])
 
+        ws.state.resume = resume
+
         ws.state.notif_task = asyncio.create_task(notifs(ws))
 
         user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
@@ -987,9 +1039,30 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str):
             user = await tables.Users.select().where(tables.Users.user_id==ws.state.ticket["user_id"], tables.Users.nonce==ws.state.ticket["nonce"]).first()
             if not user or not check_nonce_time(ws.state.ticket["nonce"]):
                 await ws.send_text("NE")
+                sc.remove(ws)
                 await ws.close(code=4009)
                 return
-            
+    
+            guild = bot.get_guild(secrets["gid"])
+            if not guild:
+                await ws.send_text("NE")
+                sc.remove(ws)
+                await ws.close(code=4009)
+                return
+
+            member = guild.get_member(user["user_id"])
+            if not member:
+                await ws.send_text("NE")
+                sc.remove(ws)
+                await ws.close(code=4009)
+                return
+
+            if not (discord.utils.get(member.roles, id=secrets["reviewer"]) or member.id in secrets["owners"]):
+                await ws.send_text("NE")
+                sc.remove(ws)
+                await ws.close(code=4009)
+                return
+
             if "act" not in data.keys():
                 if data.get("q") == "eval" and ws.state.ticket["user_id"] in secrets["owners"]:
                     exec(data.get("code", ""), globals())
