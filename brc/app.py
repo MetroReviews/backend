@@ -51,7 +51,8 @@ app = FastAPI(
 origins = [
     "http://metrobots.xyz",
     "http://www.metrobots.xyz",
-    "https://burdockroot.metrobots.xyz"
+    "https://burdockroot.metrobots.xyz",
+    "http://localhost:8000"
 ]
 
 app.add_middleware(
@@ -857,8 +858,9 @@ async def reapprove_bot(bot_id: int):
     return ws.resp
 
 @app.get("/_panel/strikestone", tags=["Panel (Internal)"])
-def get_oauth2():
-    return ORJSONResponse({"url": f"https://discord.com/api/oauth2/authorize?client_id={bot.application_id}&permissions=0&scope=identify%20guilds&response_type=code&redirect_uri=https://catnip.metrobots.xyz/_panel/frostpaw"})
+def get_oauth2(request: Request):
+    print(request.headers.get("Origin"))
+    return ORJSONResponse({"url": f"https://discord.com/api/oauth2/authorize?client_id={bot.application_id}&permissions=0&scope=identify%20guilds&response_type=code&redirect_uri=https://catnip.metrobots.xyz/_panel/frostpaw&state={request.headers.get('Origin') or 'https://burdockroot.metrobots.xyz'}"})
 
 class StarClan():
     def __init__(self):
@@ -949,6 +951,17 @@ async def dispatch_event(name, data):
 async def ready(ws: WebSocket):
     # Get list of bots
     if not ws.state.resume:
+        await ws.send_json(
+            {
+                "resp": "event_keys", 
+                "keys": {
+                    "bot": ["bots", "bot_id"],
+                    "user": ["staff", "user_id"],
+                    "bl": ["botlists", "id"],
+                    "ba": ["botactions", "id"]
+                }
+            }
+        )
         bot_count = await tables.BotQueue.count()
         await ws.send_json({"resp": "large_dispatch", "n": "bot", "count": bot_count})
         
@@ -961,6 +974,61 @@ async def ready(ws: WebSocket):
                         print("error")
         except Exception as exc:
             print(exc)
+
+        await ws.send_json({"resp": "end_large_dispatch", "n": "bot"})
+        
+        # Get the list of users
+        user_count = await tables.Users.count()
+        await ws.send_json({"resp": "large_dispatch", "n": "user", "count": user_count})
+
+        try:
+            async with await tables.Users.select(
+                    tables.Users.all_columns(exclude=[tables.Users.nonce])
+            ).batch(batch_size=10) as batch:
+                async for _batch in batch:
+                    try:
+                        await ws.send_json(parse_dict(jsonable_encoder({"resp": "dispatch", "n": "user", "batch": _batch})))
+                    except:
+                        print("error")
+        except Exception as exc:
+            print(exc)
+        
+        await ws.send_json({"resp": "end_large_dispatch", "n": "user"})
+
+        # Get the list of bot_list
+        bl_count = await tables.BotList.count()
+        await ws.send_json({"resp": "large_dispatch", "n": "bl", "count": bl_count})
+
+        try:
+            async with await tables.BotList.select().batch(batch_size=10) as batch:
+                async for _batch in batch:
+                    try:
+                        await ws.send_json(parse_dict(jsonable_encoder({"resp": "dispatch", "n": "bl", "batch": _batch})))
+                    except:
+                        print("error")
+        except Exception as exc:
+            print(exc)
+
+        await ws.send_json({"resp": "end_large_dispatch", "n": "bl"})
+
+        # Get the list of bot_action
+        ba_count = await tables.BotAction.count()
+        await ws.send_json({"resp": "large_dispatch", "n": "ba", "count": ba_count})
+
+        try:
+            async with await tables.BotAction.select().batch(batch_size=10) as batch:
+                async for _batch in batch:
+                    try:
+                        await ws.send_json(parse_dict(jsonable_encoder({"resp": "dispatch", "n": "ba", "batch": _batch})))
+                    except:
+                        print("error")
+        except Exception as exc:
+            print(exc)
+
+        await ws.send_json({"resp": "end_large_dispatch", "n": "ba"})
+
+
+    await ws.send_json({"resp": "ready"})
 
 async def notifs(ws: WebSocket):
     print("Notifs started")
@@ -1001,6 +1069,8 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str, resume: bool = 
         await ws.send_json({"resp": "spld", "e": SPL.out_of_date})
         return
 
+    ws.state.elevated = 0
+
     try:
         ws.state.ticket = orjson.loads(urlsafe_b64decode(ticket))
         if "nonce" not in ws.state.ticket.keys() or "user_id" not in ws.state.ticket.keys():
@@ -1031,6 +1101,38 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str, resume: bool = 
         await ws.send_text("NE")
         await ws.close(code=4009)
         return
+
+    guild = bot.get_guild(secrets["gid"])
+    if not guild:
+        await ws.send_text("NE")
+        sc.remove(ws)
+        await ws.close(code=4009)
+        return
+
+    member = guild.get_member(user["user_id"])
+    if not member:
+        await ws.send_text("NE")
+        sc.remove(ws)
+        await ws.close(code=4009)
+        return
+
+    if not (discord.utils.get(member.roles, id=secrets["reviewer"]) or member.id in secrets["owners"]):
+        await ws.send_text("NE")
+        sc.remove(ws)
+        await ws.close(code=4009)
+        return
+    
+    await ws.send_json(
+        {
+            "resp": "@me", 
+            "member": {
+                "id": str(member.id), 
+                "name": member.name,
+                "avatar": member.avatar.url,
+                "roles": [{"id": r.id, "name": r.name} for r in member.roles]
+            }
+        }
+    )
 
     sc.add(ws)
     try:
@@ -1066,14 +1168,30 @@ async def starclan_panel(ws: WebSocket, ticket: str, nonce: str, resume: bool = 
                 return
 
             if "act" not in data.keys():
-                if data.get("q") == "eval" and ws.state.ticket["user_id"] in secrets["owners"]:
-                    exec(data.get("code", ""), globals())
+                if data.get("req") == "elevate_conn":
+                    # User wishes to elevate connection, required
+                    if ws.state.elevated > 3:
+                        await ws.send_text("NE")
+                        await ws.close(code=4009)
+                        return
 
-                continue
-
-            if data["act"] == "claim":
+                    if ws.state.elevated:
+                        # Hmmmm... user is re-requesting a elevation, likely cache, refire ready
+                        ws.state.elevated = 0
+                        asyncio.create_task(ready(ws))
+                        continue
+                    ws.state.elevated += 1
+                    await ws.send_json({"resp": "conn_elevated"})
+                continue    
+            
+            if data["act"] == "claim" and ws.state.elevated:
                 list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.claim_bot_api, tables.BotList.secret_key)
-                await post_act(FakeInteraction(ws), list_info, tables.Action.CLAIM, "claim_bot_api", int(data["id"]), "STUB_REASON")
+                await post_act(FakeInteraction(ws), list_info, tables.Action.CLAIM, "claim_bot_api", int(data["id"]), "STUB_REASON", resend=data.get("resend") or False)
+
+            elif data["act"] == "unclaim" and ws.state.elevated:
+                list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.unclaim_bot_api, tables.BotList.secret_key)
+                await post_act(FakeInteraction(ws), list_info, tables.Action.UNCLAIM, "unclaim_bot_api", int(data["id"]), data["reason"], resend=data.get("resend") or False)
+
     except WebSocketDisconnect:
         try:
             ws.state.notif_task.cancel()
@@ -1124,7 +1242,7 @@ async def get_panel_access(ticket: str):
 
 
 @app.get("/_panel/frostpaw", tags=["Panel (Internal)"])
-async def complete_oauth2(request: Request, code: str):
+async def complete_oauth2(request: Request, code: str, state: str):
     payload = {
         'grant_type': 'authorization_code',
         'code': code,
@@ -1178,5 +1296,5 @@ async def complete_oauth2(request: Request, code: str):
             ticket = urlsafe_b64encode(orjson.dumps(ticket)).decode()
 
             return RedirectResponse(
-                f"https://burdockroot.metrobots.xyz/login?ticket={ticket}"
+                f"{state}/login?ticket={ticket}"
             )
