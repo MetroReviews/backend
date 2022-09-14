@@ -75,6 +75,8 @@ class MetroBot(commands.Bot):
 
 bot = MetroBot(intents=discord.Intents.all(), command_prefix="%")
 
+helper = MetroBot(intents=discord.Intents.all(), command_prefix=">")
+
 def check_nonce_time(nonce):
     split = nonce.split("@")
     if len(split) != 2:
@@ -97,7 +99,9 @@ with open("secrets.json") as f:
 async def open_database_connection_pool():
     engine = engine_finder()
     asyncio.create_task(bot.start(secrets["token"]))
+    asyncio.create_task(helper.start(secrets["helper_token"]))
     await bot.load_extension("jishaku")
+    await helper.load_extension("jishaku")
     await engine.start_connnection_pool()
 
 
@@ -425,6 +429,15 @@ class FSnowflake():
     """Blame discord"""
     def __init__(self, id):
         self.id: int = id
+
+@helper.command()
+async def delbot(ctx: commands.Context, bot: int):
+    owner = await ctx.bot.is_owner(ctx.author)
+    if not owner:
+        return await ctx.send("You aren't a owner of Metro...")
+    r = await tables.BotQueue.delete().where(tables.BotQueue.bot_id == bot)
+    await ctx.send(f"Success with response: {r}")
+    
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
 async def invite(interaction: discord.Interaction, bot_id: str):
