@@ -5,40 +5,6 @@ import aiohttp
 import orjson
 import traceback
 
-class SilverpeltResponse(BaseModel):
-    """
-Response to a silverpelt request
-
-- message: the message on why the request was rejected (if none, the request was accepted)
-- lists: Any list specific errors
-"""
-    message: str = None
-    lists: Optional[dict[str, "SilverpeltHttpResponse"]] = None
-
-    def to_msg(self) -> str:
-        """
-        Convert the response to a message
-        """
-        msg = ""
-        if self.message:
-            msg = f"**Request Failed**\n{self.message}"
-        if self.lists:
-            msg += "\n".join(f"{name}: {response.msg}" for name, response in self.lists.items())
-        return msg
-    
-    def to_html(self) -> str:
-        """
-        Convert the response to a message
-        """
-        msg = ""
-        if self.message:
-            msg = f"<h1>Request Failed</h1><h2>{self.message}</h2>"
-        else:
-            msg = "<h1>Request Successful</h1>"
-        if self.lists:
-            msg += "<br/><br/>".join(f"<h3>{name}<h3><br/>{response.msg}" for name, response in self.lists.items())
-        return msg
-
 class SilverpeltRequest(BaseModel):
     """Data that makes up a silverpelt request"""
     bot_id: int
@@ -67,6 +33,40 @@ class SilverpeltHttpResponse(BaseModel):
     data: Any
     exc: Optional[str] = None
     sent_data: dict
+
+class SilverpeltResponse(BaseModel):
+    """
+Response to a silverpelt request
+
+- message: the message on why the request was rejected (if none, the request was accepted)
+- lists: Any list specific errors
+"""
+    message: str = None
+    lists: Optional[dict[str, SilverpeltHttpResponse]] = None
+
+    def to_msg(self) -> str:
+        """
+        Convert the response to a message
+        """
+        msg = ""
+        if self.message:
+            msg = f"**Request Failed**\n{self.message}"
+        if self.lists:
+            msg += "\n".join(f"{name}: {response.msg}" for name, response in self.lists.items())
+        return msg
+    
+    def to_html(self) -> str:
+        """
+        Convert the response to a message
+        """
+        msg = ""
+        if self.message:
+            msg = f"<h1>Request Failed</h1><h2>{self.message}</h2>"
+        else:
+            msg = "<h1>Request Successful</h1>"
+        if self.lists:
+            msg += "<br/><br/>".join(f"<h3>{name}<h3><br/>{response.msg}" for name, response in self.lists.items())
+        return msg
 
 class Silverpelt():
     """Core heart of metro reviews"""
