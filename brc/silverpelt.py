@@ -3,7 +3,6 @@ from typing import Optional, Any
 from .tables import BotQueue, Action, State, BotList, ListState
 import aiohttp
 import orjson
-import traceback
 
 class SilverpeltRequest(BaseModel):
     """Data that makes up a silverpelt request"""
@@ -114,7 +113,7 @@ class Silverpelt():
                             status=resp.status, 
                             msg="Failed to parse response", 
                             data=None, 
-                            exc=traceback.format_exc(exc),
+                            exc=str(exc),
                             sent_data=data.data
                         )
                 
@@ -126,13 +125,13 @@ class Silverpelt():
                                 status=resp.status, 
                                 msg=f"JSON deserialisation failed", 
                                 data=json_d, 
-                                exc=traceback.format_exc(exc), 
+                                exc=str(exc), 
                                 sent_data=data.data
                             )
                     
                     return SilverpeltHttpResponse(status=resp.status, msg=None, data=json_d, sent_data=data.data)
         except Exception as exc:
-            return SilverpeltHttpResponse(status=-1, msg="Failed to make request", data=None, exc=traceback.format_exc(exc), sent_data=data.data)
+            return SilverpeltHttpResponse(status=-1, msg="Failed to make request", data=None, exc=str(exc), sent_data=data.data)
 
     async def request(self, data: SilverpeltRequest) -> Optional[SilverpeltResponse]:
         """Asks silverpelt to handle a action"""
