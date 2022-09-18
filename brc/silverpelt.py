@@ -199,7 +199,7 @@ class Silverpelt():
                             url=obj[action.list_key],
                             key=obj["secret_key"],
                             data = bot | {
-                                "bot_id": str(bot["bot_id"]), 
+                                "bot_id": str(data.bot_id), 
                                 "owner": str(bot["owner"]), 
                                 "reason": data.reason or "STUB_REASON", 
                                 "reviewer": str(data.reviewer), 
