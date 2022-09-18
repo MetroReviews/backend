@@ -160,7 +160,7 @@ class Silverpelt():
         # Update state
         await BotQueue.update(state=action.new_state).where(BotQueue.bot_id == data.bot_id)
 
-        lists = await BotList.select(BotList.id, BotList.name, BotList.state, action.list_key, BotList.secret_key)
+        lists = await BotList.select(BotList.id, BotList.name, BotList.domain, BotList.state, action.list_key, BotList.secret_key)
 
         list_resp: dict[str, SilverpeltHttpResponse] = {}
 
