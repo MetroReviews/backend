@@ -104,7 +104,8 @@ class Silverpelt():
             async with aiohttp.ClientSession() as sess:
                 async with sess.post(
                     data.url, 
-                    headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"}, 
+                    headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"},
+                    json=data.data 
                 ) as resp:
                     try:
                         json_d = await resp.text()
