@@ -51,7 +51,7 @@ Response to a silverpelt request
         if self.message:
             msg = f"**Request Failed**\n{self.message}"
         if self.lists:
-            msg += "\n".join(f"{name}: {response.msg}" for name, response in self.lists.items())
+            msg += "\n".join(f"{name}: {response.msg or 'No error: '} {response.data}" for name, response in self.lists.items())
         return msg
     
     def to_html(self) -> str:
@@ -64,7 +64,7 @@ Response to a silverpelt request
         else:
             msg = "<h1>Request Successful</h1>"
         if self.lists:
-            msg += "<br/><br/>".join(f"<h3>{name}<h3><br/>{response.msg}" for name, response in self.lists.items())
+            msg += "<br/><br/>".join(f"<h3>{name}<h3><br/>{response.msg or 'No error: '} {response.data}" for name, response in self.lists.items())
         return msg
 
 class Silverpelt():
