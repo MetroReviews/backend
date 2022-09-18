@@ -165,10 +165,11 @@ class Silverpelt():
         list_resp: dict[str, SilverpeltHttpResponse] = {}
 
         for obj in lists:
+            name = str(obj["domain"] or obj["name"] or obj["id"])
             if obj["state"] not in self.good_states:
                 continue
             if str(obj["id"]) != str(bot["list_source"]) and not bot["cross_add"]:
-                list_resp[str(obj["id"])] = (
+                list_resp[name] = (
                     await self._make_request(
                         SilverpeltHTTP(
                             url=obj[action.list_key],
@@ -194,7 +195,7 @@ class Silverpelt():
                     )
                 )
             else:
-                list_resp[str(obj["id"])] = (
+                list_resp[name] = (
                     await self._make_request(
                         SilverpeltHTTP(
                             url=obj[action.list_key],
