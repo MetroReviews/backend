@@ -178,7 +178,7 @@ class Silverpelt():
                             data = {
                                 "bot_id": str(data.bot_id), 
                                 "owner": str(bot["owner"]), 
-                                "extra_owners": [str(v) for v in data["extra_owners"]],
+                                "extra_owners": [str(v) for v in bot["extra_owners"]],
                                 "cross_add": False,
                                 "prefix": None, # Dont send prefix
                                 "description": "", # Dont send description
