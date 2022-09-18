@@ -148,9 +148,6 @@ class Silverpelt():
         if not bot:
             return SilverpeltResponse(message="Bot not found")
         
-        if data.resend and data.reviewer not in self.secrets["owners"]:
-            return SilverpeltResponse(message="You are not allowed to resend this action")
-
         action = self._actions[data.action]
 
         if not data.resend:
