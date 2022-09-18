@@ -187,6 +187,8 @@ class Silverpelt():
                                 "tags": ["this-shouldnt-be-set"], # Dont send tags
                                 "username": bot["username"], # Username is needed for approve 
                                 "added_at": bot["added_at"], 
+                                "reason": data.reason or "STUB_REASON",
+                                "reviewer": str(data.reviewer),
                                 "limited": True
                             }
                         )
@@ -203,10 +205,10 @@ class Silverpelt():
                                 "owner": str(bot["owner"]), 
                                 "reason": data.reason or "STUB_REASON", 
                                 "reviewer": str(data.reviewer), 
-                                "added_at": str(data["added_at"]), 
-                                "list_source": str(data["list_source"]),
-                                "owner": str(data["owner"]),
-                                "extra_owners": [str(v) for v in data["extra_owners"]],
+                                "added_at": str(bot["added_at"]), 
+                                "list_source": str(bot["list_source"]),
+                                "owner": str(bot["owner"]),
+                                "extra_owners": [str(v) for v in bot["extra_owners"]],
                                 "limted": False
                             },
                         )
