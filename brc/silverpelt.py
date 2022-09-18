@@ -139,7 +139,11 @@ class Silverpelt():
         if len(data.reason) < 5:
             return SilverpeltResponse(message="Reason must be at least 5 characters")
 
-        bot = await BotQueue.select(BotQueue.bot_id == data.bot_id).first()
+        bot = await BotQueue.select(BotQueue.all_columns(
+            exclude=(
+                BotQueue.bot_id,
+            )
+        )).where(BotQueue.bot_id == data.bot_id).first()
 
         if not bot:
             return SilverpeltResponse(message="Bot not found")
