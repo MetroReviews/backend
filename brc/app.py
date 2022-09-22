@@ -171,7 +171,7 @@ async def update_list(list_id: uuid.UUID, update: ListUpdate, auth: str = Depend
         await tables.BotList.update(name=update.name).where(tables.BotList.id == list_id)
         has_updated.append("name")
     if update.description:
-        await tables.BotList.update(name=update.name).where(tables.BotList.id == list_id)
+        await tables.BotList.update(description=update.description).where(tables.BotList.id == list_id)
         has_updated.append("description")
     if update.icon:
         if update.icon.startswith("https://"):
