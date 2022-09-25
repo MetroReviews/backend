@@ -76,8 +76,6 @@ class MetroBot(commands.Bot):
 
 bot = MetroBot(intents=discord.Intents.all(), command_prefix="%")
 
-helper = MetroBot(intents=discord.Intents.all(), command_prefix=">")
-
 def check_nonce_time(nonce):
     split = nonce.split("@")
     if len(split) != 2:
@@ -102,9 +100,7 @@ silverpelt = Silverpelt(secrets)
 async def open_database_connection_pool():
     engine = engine_finder()
     asyncio.create_task(bot.start(secrets["token"]))
-    asyncio.create_task(helper.start(secrets["helper_token"]))
     await bot.load_extension("jishaku")
-    await helper.load_extension("jishaku")
     await engine.start_connnection_pool()
 
 
@@ -123,14 +119,13 @@ async def get_all_lists():
 
 class BotPost(pydantic.BaseModel):
     bot_id: str
-    username: str
     banner: str | None = None
     description: str 
     long_description: str
     website: str | None = None
     invite: str | None = None
     owner: str
-    extra_owners: list[str]
+    extra_owners: list[str] | None = []
     support: str | None = None
     donate: str | None = None
     library: str | None = None
@@ -146,6 +141,7 @@ class Bot(BotPost):
     added_at: datetime.datetime
     reviewer: str | None = None
     invite_link: str | None = None
+    username: str | None = "Unknown"
 
 class ListUpdate(pydantic.BaseModel):
     name: str | None = None
@@ -299,8 +295,6 @@ emotes = {
 async def post_bots(request: Request, _bot: BotPost, list_id: uuid.UUID, auth: str = Depends(auth_header)):
     """
 All optional fields are actually *optional* and does not need to be posted
-
-``extra_owners`` should be a empty list if you do not support it
     """
     if (auth := await _auth(list_id, auth)):
         return auth 
@@ -369,11 +363,22 @@ All optional fields are actually *optional* and does not need to be posted
         # Just remove bad invite
         _bot.invite = None
         rem.append("invite")
+   
+    user = bot.get_user(bot_id)
+    if not user:
+        try:
+            user = await bot.fetch_user(bot_id)
+        except Exception as exc:
+            print(exc)
+            return ORJSONResponse({"error": "Bot does not exist?"}, status_code=400)
+
+        if not user:
+            return ORJSONResponse({"error": "Bot does not exist?"}, status_code=400)
 
     await tables.BotQueue.insert(
         tables.BotQueue(
             bot_id=bot_id, 
-            username=_bot.username, 
+            username=user.name, 
             banner=_bot.banner,
             list_source=list_id,
             description=_bot.description,
@@ -400,7 +405,7 @@ All optional fields are actually *optional* and does not need to be posted
         invite = _bot.invite
 
     # TODO: Add bot add propogation in final scope plans if this is successful
-    embed = discord.Embed(url=f"https://metrobots.xyz/bots/{bot_id}", title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {_bot.username}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
+    embed = discord.Embed(url=f"https://metrobots.xyz/bots/{bot_id}", title="Bot Added To Queue", description=f"{emotes['id']} {bot_id}\n{emotes['bot']} {user.name}\n{emotes['crown']} {_bot.owner} (<@{_bot.owner}>)\n{emotes['invite']} [Invite]({invite})\n{emotes['note']} {_bot.review_note or 'No review notes for this bot'}", color=discord.Color.green())
     c = bot.get_channel(secrets["queue_channel"])
     await c.send(f"<@&{secrets['test_ping_role'] or secrets['reviewer']}>", embed=embed)
     return {"removed": rem}
@@ -446,7 +451,7 @@ class FSnowflake():
     def __init__(self, id):
         self.id: int = id
 
-@helper.command()
+@bot.command()
 async def delbot(ctx: commands.Context, bot: int):
     owner = await ctx.bot.is_owner(ctx.author)
     if not owner:
@@ -523,7 +528,7 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
             )
         )
 
-        await interaction.followup.send(res.to_msg())
+        await interaction.followup.send(res.to_msg()[:2000])
 
 class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
     bot_id = discord.ui.TextInput(label='Bot ID')
@@ -572,6 +577,8 @@ class Approve(discord.ui.Modal, title='Approve Bot'):
         if resend and interaction.user.id not in secrets["owners"]:
             return await interaction.response.send_message("You are not an owner")
 
+        await interaction.response.defer()
+
         res = await silverpelt.request(
             SilverpeltRequest(
                 bot_id=bot_id,
@@ -600,6 +607,8 @@ class Deny(discord.ui.Modal, title='Deny Bot'):
         if resend and interaction.user.id not in secrets["owners"]:
             return await interaction.response.send_message("You are not an owner")
 
+        await interaction.response.defer()
+
         res = await silverpelt.request(
             SilverpeltRequest(
                 bot_id=bot_id,
@@ -609,7 +618,7 @@ class Deny(discord.ui.Modal, title='Deny Bot'):
                 reviewer=interaction.user.id,
             )
         )
-
+        
         await interaction.followup.send(res.to_msg())
 
 

@@ -11,10 +11,11 @@ class SilverpeltRequest(BaseModel):
     resend: bool
     action: Action
     reviewer: int
+    lists: Optional[list[str]] = None # Lists to send to, None for all
 
 class SilverpeltAction(BaseModel):
     """Internal class containing info about a possible action"""
-    banned_states: list[State]
+    allowed_states: list[State]
     error: str
     new_state: State
     list_key: str
@@ -51,8 +52,8 @@ Response to a silverpelt request
         if self.message:
             msg = f"**Request Failed**\n{self.message}"
         if self.lists:
-            msg += "\n".join(f"{name}: {response.msg or 'No error: '} {response.data}" for name, response in self.lists.items())
-        return msg
+            msg += "\n".join(f"{name}: {response.msg or 'No error: '} {response.data[:50] if response.data else 'No data'}" for name, response in self.lists.items())
+        return msg[:1900] + "...<some lines omitted>"
     
     def to_html(self) -> str:
         """
@@ -74,25 +75,25 @@ class Silverpelt():
         self.good_states = (ListState.PENDING_API_SUPPORT, ListState.SUPPORTED)
         self._actions = {
             Action.CLAIM: SilverpeltAction(
-                banned_states=[State.PENDING],
+                allowed_states=[State.PENDING],
                 error="This bot cannot be claimed as it is not pending review? Maybe someone is testing it right now?",
                 new_state=State.UNDER_REVIEW,
                 list_key="claim_bot_api"
             ),
             Action.UNCLAIM: SilverpeltAction(
-                banned_states=[State.UNDER_REVIEW],
+                allowed_states=[State.UNDER_REVIEW],
                 error="This bot cannot be unclaimed as it is not under review?",
                 new_state=State.PENDING,
                 list_key="unclaim_bot_api"
             ),
             Action.APPROVE: SilverpeltAction(
-                banned_states=[State.UNDER_REVIEW],
+                allowed_states=[State.UNDER_REVIEW],
                 error="This bot cannot be approved as it is not under review?",
                 new_state=State.APPROVED,
                 list_key="approve_bot_api"
             ),
             Action.DENY: SilverpeltAction(
-                banned_states=[State.UNDER_REVIEW],
+                allowed_states=[State.UNDER_REVIEW],
                 error="This bot cannot be denied as it is not under review?",
                 new_state=State.DENIED,
                 list_key="deny_bot_api"
@@ -152,7 +153,7 @@ class Silverpelt():
 
         if not data.resend:
             # Check if state is banned
-            if bot["state"] in action.banned_states:
+            if bot["state"] not in action.allowed_states:
                 return SilverpeltResponse(message=action.error)
 
         if action == Action.CLAIM and not data.resend:
@@ -168,6 +169,8 @@ class Silverpelt():
         for obj in lists:
             name = str(obj["domain"] or obj["name"] or obj["id"])
             if obj["state"] not in self.good_states:
+                continue
+            if data.lists and str(obj["id"]) not in data.lists:
                 continue
             if str(obj["id"]) != str(bot["list_source"]) and not bot["cross_add"]:
                 list_resp[name] = (
