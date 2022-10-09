@@ -49,20 +49,17 @@ app = FastAPI(
     ],
 )
 
-origins = [
-    "http://metrobots.xyz",
-    "http://www.metrobots.xyz",
-    "https://burdockroot.metrobots.xyz",
-    "http://localhost:8000"
-]
+@app.middleware("http")
+async def cors(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin") or "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    if request.method == "OPTIONS":
+        response.status_code = 200
+    return response
 
 with open("site.html") as site:
     site_html = site.read()
@@ -654,22 +651,6 @@ async def on_ready():
     for cmd in bot.tree.walk_commands():
         print(cmd.name)
     
-    for guild in bot.guilds:
-        if guild.owner_id == bot.user.id:
-            # Transfer ownership or delete
-            if len(guild.members) == 1:
-                await guild.delete()
-            else:
-                try:
-                    bot_id = int(guild.name.split(" ")[0])
-                    c = await guild.create_text_channel("never-remove-this")
-                    invite = await c.create_invite()
-                    await tables.BotQueue.update(invite_link=invite.url).where(tables.BotQueue.bot_id == bot_id)
-                except Exception as e:
-                    print(e)
-                await guild.edit(owner=guild.members[0])
-                await guild.leave()
-
 @bot.event
 async def on_member_join(member: discord.Member):
     if member.guild.owner_id == bot.user.id:
