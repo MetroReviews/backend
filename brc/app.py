@@ -106,11 +106,19 @@ async def close_database_connection_pool():
     engine = engine_finder()
     await engine.close_connnection_pool()
 
-@app.get("/list/{id}")
+class List(pydantic.BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str | None = None
+    domain: str | None = None
+    state: tables.ListState
+    icon: str | None = None
+
+@app.get("/list/{id}", response_model=List)
 async def get_list(id: uuid.UUID):
     return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.description, tables.BotList.domain, tables.BotList.state, tables.BotList.icon).where(tables.BotList.id == id).first()
 
-@app.get("/lists")
+@app.get("/lists", response_model=list[List])
 async def get_all_lists():
     return await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.description, tables.BotList.domain, tables.BotList.state, tables.BotList.icon).order_by(tables.BotList.id, ascending=True)
 
