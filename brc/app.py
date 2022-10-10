@@ -210,7 +210,7 @@ async def get_bot(id: int) -> Bot:
     return await tables.BotQueue.select().where(tables.BotQueue.bot_id == id).first()
 
 @app.get("/bots", response_model=list[Bot])
-async def get_bots() -> list[Bot]:
+async def get_all_bots() -> list[Bot]:
     return await tables.BotQueue.select().order_by(tables.BotQueue.bot_id, ascending=True)
 
 @app.get("/team")
