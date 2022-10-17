@@ -95,7 +95,7 @@ class Silverpelt():
     
     async def _make_request(self, data: SilverpeltHTTP) -> SilverpeltHttpResponse: 
         if not data.url:
-            return SilverpeltHttpResponse(status=400, msg="No url provided", data=None, exc=None, sent_data=None)
+            return SilverpeltHttpResponse(status=400, msg="No url provided", data=None, exc=None, sent_data=data.data)
 
         try:   
             async with aiohttp.ClientSession() as sess:
