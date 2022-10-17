@@ -102,7 +102,7 @@ class Silverpelt():
         async with aiohttp.ClientSession() as sess:
             async with sess.post(
                 data.url, 
-                headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"},
+                headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)", "Content-Type": "application/json"},
                 json=data.data,
                 timeout=30
             ) as resp:
