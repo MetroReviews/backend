@@ -112,27 +112,15 @@ class Silverpelt():
                             exc=str(exc),
                             sent_data=data.data
                         )
-                
-                    if resp.headers.get("content-type", "").startswith("application/json"):
-                        try:
-                            json_d = orjson.loads(json_d)
-                        except Exception as exc:
-                            return SilverpeltHttpResponse(
-                                status=resp.status, 
-                                msg=f"JSON deserialisation failed", 
-                                data=json_d, 
-                                exc=str(exc), 
-                                sent_data=data.data
-                            )
-                    else:
-                        return SilverpeltHttpResponse(
-                            status=resp.status,
-                            msg="Got text instead of JSON",
-                            data=json_d,
-                            sent_data=data.data,
-                        )
-                    return SilverpeltHttpResponse(status=resp.status, msg=None, data=json_d, sent_data=data.data)
+                    
+                    return SilverpeltHttpResponse(
+                        status=resp.status,
+                        msg="Success",
+                        data=json_d,
+                        sent_data=data.data,
+                    )
         except Exception as exc:
+            print(exc)
             return SilverpeltHttpResponse(status=-1, msg="Failed to make request", data=None, exc=str(type(exc))+":"+str(exc), sent_data=data.data)
 
     async def request(self, data: SilverpeltRequest) -> Optional[SilverpeltResponse]:
@@ -213,7 +201,7 @@ class Silverpelt():
                                 "list_source": str(bot["list_source"]),
                                 "owner": str(bot["owner"]),
                                 "extra_owners": [str(v) for v in bot["extra_owners"]],
-                                "limted": False
+                                "limited": False
                             },
                         )
                     )
