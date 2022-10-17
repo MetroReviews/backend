@@ -179,7 +179,7 @@ class Silverpelt():
                                 "nsfw": True, # Dont send nsfw
                                 "tags": ["this-shouldnt-be-set"], # Dont send tags
                                 "username": bot["username"], # Username is needed for approve 
-                                "added_at": bot["added_at"], 
+                                "added_at": str(bot["added_at"]), 
                                 "reason": data.reason or "STUB_REASON",
                                 "reviewer": str(data.reviewer),
                                 "limited": True
