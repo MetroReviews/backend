@@ -702,6 +702,8 @@ async def reapprove_bot(bot_id: int):
     if not _bot or _bot["state"] != tables.State.APPROVED:
         return HTMLResponse("Bot is not approved and cannot be reapproved!")
 
+    print("Am here")
+
     res = await silverpelt.request(
         SilverpeltRequest(
             bot_id=bot_id,
