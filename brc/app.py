@@ -2,6 +2,7 @@ import asyncio
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 import datetime
 import json
+import os
 import uuid
 import aiohttp
 import discord
@@ -463,7 +464,20 @@ async def delbot(ctx: commands.Context, bot: int):
         return await ctx.send("You aren't a owner of Metro...")
     r = await tables.BotQueue.delete().where(tables.BotQueue.bot_id == bot)
     await ctx.send(f"Success with response: {r}")
+
+@bot.command()
+async def register_emojis(ctx: commands.Context, bot: int):
+    # Delete all emojis first
+    for emoji in ctx.guild.emojis:
+        if emoji.name.startswith("mr_"):
+            await ctx.send(f"Deleting {emoji.name}")
+            await emoji.delete()
     
+    # Add all emojis from assets folder
+    for emoji in os.listdir("assets"):
+        if emoji.endswith(".webp"):
+            await ctx.send(f"Adding {emoji}")
+            await ctx.guild.create_custom_emoji(name="mr_"+emoji.replace(".webp", ""), image=open(f"assets/{emoji}", "rb").read())
 
 @bot.tree.command(guild=FSnowflake(id=secrets["gid"]))
 async def invite(interaction: discord.Interaction, bot_id: str):
