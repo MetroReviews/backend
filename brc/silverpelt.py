@@ -102,7 +102,7 @@ class Silverpelt():
     
     async def _make_request(self, data: SilverpeltHTTP) -> SilverpeltHttpResponse:     
         try:   
-            async with aiohttp.ClientSession() as sess:
+            async with aiohttp.ClientSession(timeout=10) as sess:
                 async with sess.post(
                     data.url, 
                     headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"},
