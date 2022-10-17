@@ -467,6 +467,9 @@ async def delbot(ctx: commands.Context, bot: int):
 
 @bot.command()
 async def register_emojis(ctx: commands.Context):
+    if ctx.author.id not in secrets["owners"]:
+        return await ctx.send("You are not an owner")
+
     # Delete all emojis first
     for emoji in ctx.guild.emojis:
         if emoji.name.startswith("mr_"):
