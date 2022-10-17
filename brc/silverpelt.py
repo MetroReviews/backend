@@ -59,14 +59,7 @@ Response to a silverpelt request
         """
         Convert the response to a message
         """
-        msg = ""
-        if self.message:
-            msg = f"<h1>Request Failed</h1><h2>{self.message}</h2>"
-        else:
-            msg = "<h1>Request Successful</h1>"
-        if self.lists:
-            msg += "<br/><br/>".join(f"<h3>{name}<h3><br/>{response.msg or 'No error: '} {response.data}" for name, response in self.lists.items())
-        return msg
+        return str(self)
 
 class Silverpelt():
     """Core heart of metro reviews"""
