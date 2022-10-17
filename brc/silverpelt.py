@@ -175,7 +175,7 @@ class Silverpelt():
                                 "prefix": None, # Dont send prefix
                                 "description": "", # Dont send description
                                 "long_description": "", # Dont send ld
-                                "list_source": bot["list_source"],
+                                "list_source": str(bot["list_source"]),
                                 "nsfw": True, # Dont send nsfw
                                 "tags": ["this-shouldnt-be-set"], # Dont send tags
                                 "username": bot["username"], # Username is needed for approve 
