@@ -196,6 +196,12 @@ class Silverpelt():
                             data = bot | {
                                 "bot_id": str(data.bot_id), 
                                 "owner": str(bot["owner"]), 
+                                "extra_owners": [str(v) for v in bot["extra_owners"]],
+                                "cross_add": True,
+                                "prefix": bot["prefix"] or None,
+                                "description": bot["description"] or "Some description",
+                                "reason": data.reason or "STUB_REASON",
+                                "reviewer": str(data.reviewer),
                                 "reason": data.reason or "STUB_REASON", 
                                 "reviewer": str(data.reviewer), 
                                 "added_at": str(bot["added_at"]), 
