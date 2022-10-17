@@ -104,7 +104,7 @@ class Silverpelt():
                 data.url, 
                 headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"},
                 json=data.data,
-                timeout=10
+                timeout=30
             ) as resp:
                 try:
                     json_d = await resp.text()
