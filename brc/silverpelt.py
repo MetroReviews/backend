@@ -93,31 +93,37 @@ class Silverpelt():
             )
         }
     
-    async def _make_request(self, data: SilverpeltHTTP) -> SilverpeltHttpResponse:     
-        async with aiohttp.ClientSession() as sess:
-            async with sess.post(
-                data.url, 
-                headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"},
-                json=data.data,
-                timeout=10
-            ) as resp:
-                try:
-                    json_d = await resp.text()
-                except Exception as exc:
+    async def _make_request(self, data: SilverpeltHTTP) -> SilverpeltHttpResponse: 
+        if not data.url:
+            return SilverpeltHttpResponse(status=400, msg="No url provided", data=None, exc=None, sent_data=None)
+
+        try:   
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post(
+                    data.url, 
+                    headers={"Authorization": data.key, "User-Agent": "Frostpaw/0.2 (Silverpelt)"},
+                    json=data.data,
+                    timeout=10
+                ) as resp:
+                    try:
+                        json_d = await resp.text()
+                    except Exception as exc:
+                        return SilverpeltHttpResponse(
+                            status=resp.status, 
+                            msg="Failed to parse response", 
+                            data=None, 
+                            exc=str(exc),
+                            sent_data=data.data
+                        )
+                    
                     return SilverpeltHttpResponse(
-                        status=resp.status, 
-                        msg="Failed to parse response", 
-                        data=None, 
-                        exc=str(exc),
-                        sent_data=data.data
+                        status=resp.status,
+                        msg="Success",
+                        data=json_d,
+                        sent_data=data.data,
                     )
-                
-                return SilverpeltHttpResponse(
-                    status=resp.status,
-                    msg="Success",
-                    data=json_d,
-                    sent_data=data.data,
-                )
+        except Exception as exc:
+            return SilverpeltHttpResponse(status=-1, msg="Failed to make request", data=None, exc=str(type(exc))+":"+str(exc), sent_data=data.data)
 
     async def request(self, data: SilverpeltRequest) -> Optional[SilverpeltResponse]:
         """Asks silverpelt to handle a action"""
