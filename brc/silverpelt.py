@@ -94,7 +94,7 @@ class Silverpelt():
         }
     
     async def _make_request(self, data: SilverpeltHTTP) -> SilverpeltHttpResponse: 
-        if not data.url:
+        if not data.url or not data.url.startswith("https://"):
             return SilverpeltHttpResponse(status=400, msg="No url provided", data=None, exc=None, sent_data=data.data)
 
         print(data.url)
