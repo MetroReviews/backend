@@ -434,19 +434,19 @@ def mr_command(modal_class):
         return f
     return wrapper
 
-def is_reviewer(ctx: commands.Context):
+def is_reviewer(interaction: discord.Interaction):
     """Checks if the user is a reviewer"""
-    if ctx.author.id in secrets["owners"]:
+    if interaction.user.id in secrets["owners"]:
         return True
 
-    if ctx.guild.id != secrets["gid"]:
+    if not interaction.guild or interaction.guild.id != secrets["gid"]:
         guild = bot.get_guild(secrets["gid"])
         try:
-            roles = guild.get_member(ctx.author.id).roles
+            roles = guild.get_member(interaction.user.id).roles
         except:
             return False
     else:
-        roles = ctx.author.roles
+        roles = interaction.user.roles
 
     if not discord.utils.get(roles, id=secrets["reviewer"]):
         return False
@@ -528,6 +528,9 @@ class Claim(discord.ui.Modal, title='Claim Bot'):
     resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not is_reviewer(interaction):
+            return await interaction.response.send_message("You are not a reviewer", ephemeral=True)
+
         try:
             bot_id = int(self.bot_id.value)
         except:
@@ -558,6 +561,9 @@ class Unclaim(discord.ui.Modal, title='Unclaim Bot'):
     resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not is_reviewer(interaction):
+            return await interaction.response.send_message("You are not a reviewer", ephemeral=True)
+
         try:
             bot_id = int(self.bot_id.value)
         except:
@@ -589,6 +595,9 @@ class Approve(discord.ui.Modal, title='Approve Bot'):
 
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not is_reviewer(interaction):
+            return await interaction.response.send_message("You are not a reviewer", ephemeral=True)
+
         try:
             bot_id = int(self.bot_id.value)
         except:
@@ -619,6 +628,9 @@ class Deny(discord.ui.Modal, title='Deny Bot'):
     resend = discord.ui.TextInput(label='Resend to other lists (owner only, T/F)', default="F")
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not is_reviewer(interaction):
+            return await interaction.response.send_message("You are not a reviewer", ephemeral=True)
+
         try:
             bot_id = int(self.bot_id.value)
         except:
@@ -684,12 +696,10 @@ async def on_member_join(member: discord.Member):
         await member.guild.leave()
 
 @app.get("/littlecloud/{bot_id}")
-async def reapprove_bot(bot_id: int):
-    list_info = await tables.BotList.select(tables.BotList.id, tables.BotList.name, tables.BotList.state, tables.BotList.approve_bot_api, tables.BotList.secret_key)
-    
-    bot = await tables.BotQueue.select(tables.BotQueue.state).where(tables.BotQueue.bot_id == bot_id).first()
+async def reapprove_bot(bot_id: int):    
+    _bot = await tables.BotQueue.select(tables.BotQueue.state).where(tables.BotQueue.bot_id == bot_id).first()
 
-    if not bot or bot["state"] != tables.State.APPROVED:
+    if not _bot or _bot["state"] != tables.State.APPROVED:
         return HTMLResponse("Bot is not approved and cannot be reapproved!")
 
     res = await silverpelt.request(
@@ -698,7 +708,7 @@ async def reapprove_bot(bot_id: int):
             reason="Already approved, readding due to errors (Automated Action)",
             resend=True,
             action=tables.Action.APPROVE,
-            reviewer=968734728465289248,
+            reviewer=bot.user.id,
         )
     )
 
