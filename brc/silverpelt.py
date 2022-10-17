@@ -130,7 +130,13 @@ class Silverpelt():
                                 exc=str(exc), 
                                 sent_data=data.data
                             )
-                    
+                    else:
+                        return SilverpeltHttpResponse(
+                            status=resp.status,
+                            msg="Got text instead of JSON",
+                            data=json_d,
+                            sent_data=data.data,
+                        )
                     return SilverpeltHttpResponse(status=resp.status, msg=None, data=json_d, sent_data=data.data)
         except Exception as exc:
             return SilverpeltHttpResponse(status=-1, msg="Failed to make request", data=None, exc=str(exc), sent_data=data.data)
