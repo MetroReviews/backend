@@ -466,7 +466,7 @@ async def delbot(ctx: commands.Context, bot: int):
     await ctx.send(f"Success with response: {r}")
 
 @bot.command()
-async def register_emojis(ctx: commands.Context, bot: int):
+async def register_emojis(ctx: commands.Context):
     # Delete all emojis first
     for emoji in ctx.guild.emojis:
         if emoji.name.startswith("mr_"):
