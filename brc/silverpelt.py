@@ -97,7 +97,7 @@ class Silverpelt():
         if not data.url:
             return SilverpeltHttpResponse(status=400, msg="No url provided", data=None, exc=None, sent_data=data.data)
 
-        print(data)
+        print(data.url)
 
         async with aiohttp.ClientSession() as sess:
             async with sess.post(
