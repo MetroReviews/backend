@@ -162,57 +162,32 @@ class Silverpelt():
             if data.lists and str(obj["id"]) not in data.lists:
                 continue
             if str(obj["id"]) != str(bot["list_source"]) and not bot["cross_add"]:
-                list_resp[name] = (
-                    await self._make_request(
-                        SilverpeltHTTP(
-                            url=obj[action.list_key],
-                            key=obj["secret_key"],
-                            data = {
-                                "bot_id": str(data.bot_id), 
-                                "owner": str(bot["owner"]), 
-                                "extra_owners": [str(v) for v in bot["extra_owners"]],
-                                "cross_add": False,
-                                "prefix": None, # Dont send prefix
-                                "description": "", # Dont send description
-                                "long_description": "", # Dont send ld
-                                "list_source": str(bot["list_source"]),
-                                "nsfw": True, # Dont send nsfw
-                                "tags": ["this-shouldnt-be-set"], # Dont send tags
-                                "username": bot["username"], # Username is needed for approve 
-                                "added_at": str(bot["added_at"]), 
-                                "reason": data.reason or "STUB_REASON",
-                                "reviewer": str(data.reviewer),
-                                "limited": True
-                            }
-                        )
+                continue
+            list_resp[name] = (
+                await self._make_request(
+                    SilverpeltHTTP(
+                        url=obj[action.list_key],
+                        key=obj["secret_key"],
+                        data = bot | {
+                            "bot_id": str(data.bot_id), 
+                            "owner": str(bot["owner"]), 
+                            "extra_owners": [str(v) for v in bot["extra_owners"]],
+                            "cross_add": True,
+                            "prefix": bot["prefix"] or None,
+                            "description": bot["description"] or "Some description",
+                            "reason": data.reason or "STUB_REASON",
+                            "reviewer": str(data.reviewer),
+                            "reason": data.reason or "STUB_REASON", 
+                            "reviewer": str(data.reviewer), 
+                            "added_at": str(bot["added_at"]), 
+                            "list_source": str(bot["list_source"]),
+                            "owner": str(bot["owner"]),
+                            "extra_owners": [str(v) for v in bot["extra_owners"]],
+                            "limited": False
+                        },
                     )
                 )
-            else:
-                list_resp[name] = (
-                    await self._make_request(
-                        SilverpeltHTTP(
-                            url=obj[action.list_key],
-                            key=obj["secret_key"],
-                            data = bot | {
-                                "bot_id": str(data.bot_id), 
-                                "owner": str(bot["owner"]), 
-                                "extra_owners": [str(v) for v in bot["extra_owners"]],
-                                "cross_add": True,
-                                "prefix": bot["prefix"] or None,
-                                "description": bot["description"] or "Some description",
-                                "reason": data.reason or "STUB_REASON",
-                                "reviewer": str(data.reviewer),
-                                "reason": data.reason or "STUB_REASON", 
-                                "reviewer": str(data.reviewer), 
-                                "added_at": str(bot["added_at"]), 
-                                "list_source": str(bot["list_source"]),
-                                "owner": str(bot["owner"]),
-                                "extra_owners": [str(v) for v in bot["extra_owners"]],
-                                "limited": False
-                            },
-                        )
-                    )
-                )
+            )
         
         return SilverpeltResponse(
             lists=list_resp
