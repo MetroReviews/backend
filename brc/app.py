@@ -688,13 +688,6 @@ async def on_ready():
     for cmd in bot.tree.walk_commands():
         print(cmd.name)
     
-@bot.event
-async def on_member_join(member: discord.Member):
-    if member.guild.owner_id == bot.user.id:
-        # This is a bot owned guild, transfer ownership and leave
-        await member.guild.edit(owner=member)
-        await member.guild.leave()
-
 @app.get("/littlecloud/{bot_id}")
 async def reapprove_bot(bot_id: int):    
     _bot = await tables.BotQueue.select(tables.BotQueue.state).where(tables.BotQueue.bot_id == bot_id).first()
