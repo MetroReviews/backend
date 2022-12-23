@@ -167,14 +167,11 @@ class Silverpelt():
                         SilverpeltHTTP(
                             url=obj[action.list_key],
                             key=obj["secret_key"],
-                            data = bot | {
+                            data = {
                                 "bot_id": str(data.bot_id), 
-                                "owner": str(bot["owner"]), 
-                                "cross_add": False,
-                                "reason": data.reason or "STUB_REASON",
+                                "can_add": False,
                                 "reviewer": str(data.reviewer), 
-                                "list_source": str(bot["list_source"]),
-                                "limited": True
+                                "reason": data.reason or "No reason provided",
                             },
                         )
                     )
@@ -185,19 +182,11 @@ class Silverpelt():
                     SilverpeltHTTP(
                         url=obj[action.list_key],
                         key=obj["secret_key"],
-                        data = bot | {
+                        data = {
                             "bot_id": str(data.bot_id), 
-                            "owner": str(bot["owner"]), 
-                            "cross_add": bot["cross_add"],
-                            "prefix": bot["prefix"] or None,
-                            "description": bot["description"] or "Some description",
-                            "reason": data.reason or "STUB_REASON",
-                            "reviewer": str(data.reviewer),
-                            "added_at": str(bot["added_at"]), 
-                            "list_source": str(bot["list_source"]),
-                            "owner": str(bot["owner"]),
-                            "extra_owners": [str(v) for v in bot["extra_owners"]],
-                            "limited": False
+                            "can_add": True,
+                            "reviewer": str(data.reviewer), 
+                            "reason": data.reason or "No reason provided",
                         },
                     )
                 )
